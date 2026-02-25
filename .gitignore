@@ -1,0 +1,22 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (if you ever add a build step)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar.gz
