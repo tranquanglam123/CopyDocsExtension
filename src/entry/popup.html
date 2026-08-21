@@ -28,7 +28,7 @@
         </svg>
         <h1>CopyDocExt</h1>
       </div>
-      <p class="subtitle">Extract restricted Google Docs</p>
+      <p class="subtitle" data-i18n="popup.subtitle">Extract restricted Google Docs</p>
     </header>
 
     <!-- Status Card -->
@@ -36,7 +36,7 @@
       <div class="status-row">
         <span id="status-icon" class="status-icon">⏳</span>
         <div>
-          <p id="status-title" class="status-title">Checking…</p>
+          <p id="status-title" class="status-title" data-i18n="popup.status.checking">Checking…</p>
           <p id="status-detail" class="status-detail"></p>
         </div>
       </div>
@@ -53,31 +53,31 @@
       <div class="progress-steps">
         <div class="step" id="step-validate" data-step="1">
           <span class="step-dot"></span>
-          <span class="step-label">Validate</span>
+          <span class="step-label" data-i18n="popup.step.validate">Validate</span>
         </div>
         <div class="step" id="step-fetch" data-step="2">
           <span class="step-dot"></span>
-          <span class="step-label">Fetch</span>
+          <span class="step-label" data-i18n="popup.step.fetch">Fetch</span>
         </div>
         <div class="step" id="step-parse" data-step="3">
           <span class="step-dot"></span>
-          <span class="step-label">Parse</span>
+          <span class="step-label" data-i18n="popup.step.parse">Parse</span>
         </div>
         <div class="step hidden" id="step-block" data-step="2">
           <span class="step-dot"></span>
-          <span class="step-label">Block JS</span>
+          <span class="step-label" data-i18n="popup.step.blockJs">Block JS</span>
         </div>
         <div class="step hidden" id="step-navigate" data-step="3">
           <span class="step-dot"></span>
-          <span class="step-label">Navigate</span>
+          <span class="step-label" data-i18n="popup.step.navigate">Navigate</span>
         </div>
         <div class="step hidden" id="step-extract" data-step="4">
           <span class="step-dot"></span>
-          <span class="step-label">Extract</span>
+          <span class="step-label" data-i18n="popup.step.extract">Extract</span>
         </div>
         <div class="step" id="step-done" data-step="5">
           <span class="step-dot"></span>
-          <span class="step-label">Done</span>
+          <span class="step-label" data-i18n="popup.step.done">Done</span>
         </div>
       </div>
       <div class="progress-bar">
@@ -101,7 +101,7 @@
     <section id="options-row" class="options-row">
       <label class="option-toggle" for="chk-embed-images">
         <input type="checkbox" id="chk-embed-images" checked />
-        <span>Embed images</span>
+        <span data-i18n="popup.options.embedImages">Embed images</span>
       </label>
     </section>
 
@@ -114,7 +114,7 @@
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        Extract Content
+        <span data-i18n="popup.action.extract">Extract Content</span>
       </button>
     </section>
 
@@ -122,17 +122,19 @@
     <section id="actions-export" class="actions-grid hidden">
 
       <!-- Copy with formatting -->
-      <button id="btn-copy" class="btn btn-accent" title="Copy with formatting (paste into Google Docs / Word)">
+      <button id="btn-copy" class="btn btn-accent" data-i18n-title="popup.action.copyTitle"
+        title="Copy with formatting (paste into Google Docs / Word)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
-        Copy
+        <span data-i18n="popup.action.copy">Copy</span>
       </button>
 
       <!-- Open in new Google Doc -->
-      <button id="btn-new-doc" class="btn btn-accent" title="Copy & open a new Google Doc — press Ctrl+V to paste">
+      <button id="btn-new-doc" class="btn btn-accent" data-i18n-title="popup.action.newDocTitle"
+        title="Copy & open a new Google Doc — press Ctrl+V to paste">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -140,29 +142,31 @@
           <line x1="12" y1="18" x2="12" y2="12" />
           <line x1="9" y1="15" x2="15" y2="15" />
         </svg>
-        New Doc
+        <span data-i18n="popup.action.newDoc">New Doc</span>
       </button>
 
       <!-- Download .docx -->
-      <button id="btn-download-docx" class="btn btn-secondary" title="Download as Word document (.docx)">
+      <button id="btn-download-docx" class="btn btn-secondary" data-i18n-title="popup.action.docxTitle"
+        title="Download as Word document (.docx)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        .docx
+        <span data-i18n="popup.action.docx">.docx</span>
       </button>
 
       <!-- Download .txt -->
-      <button id="btn-download-txt" class="btn btn-secondary" title="Download as plain text (.txt)">
+      <button id="btn-download-txt" class="btn btn-secondary" data-i18n-title="popup.action.txtTitle"
+        title="Download as plain text (.txt)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        .txt
+        <span data-i18n="popup.action.txt">.txt</span>
       </button>
 
     </section>
@@ -172,7 +176,7 @@
          reach the clipboard (Copy / New Doc) output, never the .docx
          download. Stated up front rather than left for the user to
          discover. -->
-    <p id="docx-image-note" class="docx-image-note hidden">
+    <p id="docx-image-note" class="docx-image-note hidden" data-i18n="popup.docxNote">
       Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.
     </p>
 
@@ -181,9 +185,19 @@
       <span id="notification-text"></span>
     </div>
 
-    <!-- Footer -->
+    <!-- Footer — language selector (spec v3 §5.5) next to the version.
+         Switching re-renders the popup immediately, see
+         ui/popup-controller.js's handleLanguageChange(). Native language
+         names in the options, not translated ones — the usual convention
+         for a language picker, so a user who picked the wrong language by
+         accident can still recognize their own. -->
     <footer class="popup-footer">
       <span>v2.0.0</span>
+      <select id="lang-select" class="lang-select" data-i18n-aria-label="popup.footer.languageLabel"
+        aria-label="Language">
+        <option value="en">English</option>
+        <option value="vi">Tiếng Việt</option>
+      </select>
     </footer>
   </div>
 

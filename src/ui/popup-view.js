@@ -12,6 +12,7 @@
  */
 
 import { WARNINGS, WARNING_PREFIXES } from '../shared/constants.js';
+import { I18n } from '../shared/i18n.js';
 
 // ── DOM references ───────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ const warningsBanner = document.getElementById('warnings-banner');
 const warningsText = document.getElementById('warnings-text');
 
 const chkEmbedImages = document.getElementById('chk-embed-images');
+const langSelect = document.getElementById('lang-select');
 
 /**
  * The handful of elements the entry file needs handles to for
@@ -51,49 +53,69 @@ export const elements = {
     btnDownloadDocx,
     btnDownloadTxt,
     chkEmbedImages,
+    langSelect,
 };
+
+// ── i18n (spec v3 §5) ──────────────────────────────────────────────
+
+/** Fill every [data-i18n]/[data-i18n-title]/[data-i18n-aria-label] element. */
+export function applyStaticI18n() {
+    I18n.apply(document);
+}
+
+/** @returns {string} The language currently selected in the footer picker. */
+export function getSelectedLanguage() {
+    return langSelect.value;
+}
+
+/** @param {string} lang */
+export function setSelectedLanguage(lang) {
+    langSelect.value = lang;
+}
 
 // ── Warnings (meta.warnings from the extraction result) ───────────
 // Never silent: an unrecognized warning code still renders verbatim
 // instead of being swallowed.
 //
 // Codes come from shared/constants.js (spec v3 §4 T2) so a typo can't
-// silently desync the popup from what the pipelines actually emit.
+// silently desync the popup from what the pipelines actually emit. Each
+// maps to an i18n key (`warning.<code>`, spec v3 §5.4) rather than an
+// English sentence, so it renders translated regardless of language.
 // `low_confidence` and `multi_tab_partial` have no entry in
 // shared/constants.js WARNINGS — they are not produced anywhere in the
 // codebase today — so they stay as literal keys here rather than being
-// invented in the shared constants file.
+// invented in the shared constants file; both still have en/vi message
+// keys (test/i18n.test.js only requires the constants.js-listed codes).
 
-const WARNING_MESSAGES = {
-    [WARNINGS.SINGLE_SHEET_ONLY]: 'Only the first sheet was read (gid=0) — other sheets in this spreadsheet were not extracted.',
-    low_confidence: 'Low-confidence extraction — the result may be incomplete.',
-    multi_tab_partial: 'Multi-tab doc: only the first tab was extracted.',
-    [WARNINGS.TABNAV_FALLBACK]: 'Direct fetch failed, so the extension fell back to the legacy method — your tab may have briefly navigated to the mobile view.',
-    [WARNINGS.IMAGE_BUDGET_EXCEEDED]: 'Some images were too large to embed within the size budget, so they were left as links to Google Docs instead — they will only work while your session can reach them.',
-    [WARNINGS.STYLE_FILL_SKIPPED_SIZE]: 'The formatted result was too large, so some computed styling was skipped — inline formatting from the source still applied.',
+const WARNING_KEYS = {
+    [WARNINGS.SINGLE_SHEET_ONLY]: 'warning.single_sheet_only',
+    [WARNINGS.TABNAV_FALLBACK]: 'warning.tabnav_fallback',
+    [WARNINGS.LEGACY_PARSER_FALLBACK]: 'warning.legacy_parser_fallback',
+    [WARNINGS.STYLE_FILL_SKIPPED_SIZE]: 'warning.style_fill_skipped_size',
+    [WARNINGS.CONTAINER_FALLBACK_USED]: 'warning.container_fallback_used',
+    [WARNINGS.CONTAINER_NOT_FOUND]: 'warning.container_not_found',
+    [WARNINGS.EMPTY_CONTENT]: 'warning.empty_content',
+    [WARNINGS.IMAGE_BUDGET_EXCEEDED]: 'warning.image_budget_exceeded',
+    low_confidence: 'warning.low_confidence',
+    multi_tab_partial: 'warning.multi_tab_partial',
 };
 
 // Warning codes that carry a dynamic `:<n>` count suffix (spec §4.3) —
-// matched by prefix so the count itself doesn't need a dictionary entry.
-const WARNING_PREFIX_MESSAGES = [
-    {
-        prefix: `${WARNING_PREFIXES.IMAGE_EMBED_FAILED}:`,
-        build: (n) => `${n} image${n === '1' ? '' : 's'} could not be fetched and were left as links to Google Docs instead of being embedded.`,
-    },
-    {
-        prefix: `${WARNING_PREFIXES.IMAGE_NOT_BITMAP}:`,
-        build: (n) => `${n} image${n === '1' ? '' : 's'} could not be embedded because the source wasn't actually a picture (e.g. a viewer page, not a bitmap) — left as a link instead.`,
-    },
+// matched by prefix, the count is interpolated as the `{count}` param.
+const WARNING_PREFIX_KEYS = [
+    { prefix: `${WARNING_PREFIXES.IMAGE_EMBED_FAILED}:`, key: 'warning.image_embed_failed' },
+    { prefix: `${WARNING_PREFIXES.IMAGE_NOT_BITMAP}:`, key: 'warning.image_not_bitmap' },
 ];
 
 /**
  * @param {string} code  A raw warning code from meta.warnings.
- * @returns {string} A human-readable message — the code itself if unrecognized (never silent).
+ * @returns {string} A human-readable, translated message — the code itself
+ *   if unrecognized (never silent).
  */
 function warningMessage(code) {
-    if (WARNING_MESSAGES[code]) return WARNING_MESSAGES[code];
-    for (const { prefix, build } of WARNING_PREFIX_MESSAGES) {
-        if (code.startsWith(prefix)) return build(code.slice(prefix.length));
+    if (WARNING_KEYS[code]) return I18n.t(WARNING_KEYS[code]);
+    for (const { prefix, key } of WARNING_PREFIX_KEYS) {
+        if (code.startsWith(prefix)) return I18n.t(key, { count: code.slice(prefix.length) });
     }
     return code;
 }
@@ -203,15 +225,15 @@ export function renderExtractionResult(data) {
     setStep(activeSteps.length - 1);
     setStatus(
         '✅',
-        'Extraction Complete',
-        `${data.charCount.toLocaleString()} characters extracted`,
+        I18n.t('popup.status.extractionCompleteTitle'),
+        I18n.t('popup.status.extractedDetail', { count: data.charCount.toLocaleString() }),
         'valid'
     );
     showWarnings(data.meta?.warnings);
     actionsExport.classList.remove('hidden');
     docxImageNote.classList.remove('hidden');
     btnExtract.disabled = true;
-    showNotification(`"${data.title}" ready — copy, open in new doc, or download!`, 'success');
+    showNotification(I18n.t('popup.notify.ready', { title: data.title }), 'success');
 }
 
 /** Popup reopened while a tabNav-fallback extraction is still running. */
@@ -219,35 +241,39 @@ export function renderRecoveryRunning() {
     progressSection.classList.remove('hidden');
     setStepMode('tabnav');
     setStep(2);
-    setStatus('🔄', 'Extracting…', 'Waiting for content extraction…');
+    setStatus('🔄', I18n.t('popup.status.recoveryTitle'), I18n.t('popup.status.recoveryDetail'));
     btnExtract.disabled = true;
 }
 
 export function renderSlidesUnsupported() {
     setStatus(
         '🚧',
-        'Google Slides not supported yet',
-        'Slides extraction isn\'t available in this version — try a Doc or Sheet instead.',
+        I18n.t('popup.status.slidesTitle'),
+        I18n.t('popup.status.slidesDetail'),
         'invalid'
     );
     btnExtract.disabled = true;
 }
 
-export function renderDocDetected(typeLabel, url) {
-    setStatus('✅', `${typeLabel} detected`, truncateUrl(url), 'valid');
+/**
+ * @param {string} type  A DOC_TYPES value ('docs'|'sheets'|'slides').
+ * @param {string} url
+ */
+export function renderDocDetected(type, url) {
+    setStatus('✅', I18n.t('popup.status.docDetected', { type: I18n.t(`docType.${type}`) }), truncateUrl(url), 'valid');
     btnExtract.disabled = false;
 }
 
 export function renderNotADoc() {
-    setStatus('❌', 'Not a Google Doc', 'Navigate to a Google Doc, Sheet, or Slide.', 'invalid');
+    setStatus('❌', I18n.t('popup.status.notADocTitle'), I18n.t('popup.status.notADocDetail'), 'invalid');
     btnExtract.disabled = true;
 }
 
 export function renderInitError(message) {
-    setStatus('⚠️', 'Error', message, 'invalid');
+    setStatus('⚠️', I18n.t('popup.status.initErrorTitle'), message, 'invalid');
     btnExtract.disabled = true;
 }
 
 export function renderExtractionFailed(message) {
-    setStatus('❌', 'Extraction Failed', message, 'invalid');
+    setStatus('❌', I18n.t('popup.status.extractionFailedTitle'), message, 'invalid');
 }

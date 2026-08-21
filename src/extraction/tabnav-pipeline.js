@@ -21,6 +21,7 @@
  * to fall back to).
  */
 import { DOC_TYPES, TRANSPORTS } from '../shared/constants.js';
+import { AppError } from '../core/app-error.js';
 import { PolicyManager } from '../platform/net-rules.js';
 import { waitForTabLoad, navigateTab } from '../platform/tabs.js';
 import { OffscreenManager } from '../platform/offscreen-host.js';
@@ -73,7 +74,7 @@ export async function runTabNavPipeline(tab, target, docId) {
             setTimeout(() => {
                 if (_pendingExtraction) {
                     _pendingExtraction = null;
-                    reject(new Error('Content extraction timed out (20s). The page may not have loaded correctly.'));
+                    reject(new AppError('error.contentExtractionTimeout'));
                 }
             }, 20000);
         });
@@ -128,8 +129,8 @@ export async function runTabNavPipeline(tab, target, docId) {
  * @returns {Promise<object>}
  */
 export async function handleContentReady(payload, tabId) {
-    if (!payload) throw new Error('Content script sent an empty payload.');
-    if (!payload.rawHtml) throw new Error('Content script payload is missing rawHtml.');
+    if (!payload) throw new AppError('error.emptyPayload');
+    if (!payload.rawHtml) throw new AppError('error.missingRawHtml');
 
     let result;
     try {
@@ -141,7 +142,7 @@ export async function handleContentReady(payload, tabId) {
         result = await embedImagesIntoResult(result, tabId);
     } catch (err) {
         console.error('[tabnav-pipeline] Offscreen parse failed — no fallback parser is available:', err);
-        throw new Error(`Extraction failed: the offscreen parser could not process this document (${err.message}).`);
+        throw new AppError('error.offscreenParseFailed', { message: err.message });
     }
 
     await setExtractionComplete(result);

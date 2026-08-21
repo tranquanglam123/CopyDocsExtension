@@ -20,8 +20,13 @@ view.elements.btnNewDoc.addEventListener('click', controller.handleNewDoc);
 view.elements.btnDownloadDocx.addEventListener('click', controller.handleDownloadDocx);
 view.elements.btnDownloadTxt.addEventListener('click', controller.handleDownloadTxt);
 view.elements.chkEmbedImages.addEventListener('change', controller.handleEmbedImagesChange);
+view.elements.langSelect.addEventListener('change', controller.handleLanguageChange);
 
 // ── Boot ─────────────────────────────────────────────────────────
+// i18n loads first (spec v3 §5) so nothing renders untranslated even for
+// an instant — everything downstream of it (labels, statuses, errors)
+// depends on I18n already having a dictionary loaded.
 
+await controller.initI18n();
 controller.initEmbedImagesToggle();
 controller.init();

@@ -10,6 +10,7 @@
 import { DOC_TYPES, TRANSPORTS, WARNINGS } from '../shared/constants.js';
 import { parseCsv, csvToHtml } from '../core/csv-to-html.js';
 import { wrapAsDocument } from '../core/html-document.js';
+import { AppError } from '../core/app-error.js';
 import { PipelineState } from './pipeline-state.js';
 import { setExtractionComplete } from '../platform/storage.js';
 
@@ -34,22 +35,19 @@ export async function runSwFetchPipeline(tab, target, docId) {
         try {
             response = await fetch(target.url, { credentials: 'include' });
         } catch (err) {
-            throw new Error(`Network request failed while fetching the sheet: ${err.message}`);
+            throw new AppError('error.sheetNetworkFailed', { message: err.message });
         }
 
         // Login-wall via redirect (e.g. accounts.google.com/ServiceLogin).
         if (response.url && /accounts\.google\.com|\/ServiceLogin/i.test(response.url)) {
-            throw new Error(
-                'This spreadsheet requires sign-in — the extension could not access it ' +
-                '(redirected to a Google login page).'
-            );
+            throw new AppError('error.sheetSignInRequired');
         }
 
         const contentType = response.headers.get('content-type') || '';
         const bodyText = await response.text();
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch sheet data (HTTP ${response.status}).`);
+            throw new AppError('error.sheetFetchFailed', { status: response.status });
         }
 
         // Login-wall / access-wall via body content (gviz returns a
@@ -62,20 +60,14 @@ export async function runSwFetchPipeline(tab, target, docId) {
         // response can be an access wall.
         const isCsvResponse = /text\/csv|application\/csv/i.test(contentType);
         if (!isCsvResponse && /Sign in|You need access|Request access/i.test(bodyText)) {
-            throw new Error(
-                'This spreadsheet requires access — the extension could not read it ' +
-                '(access wall detected in the response).'
-            );
+            throw new AppError('error.sheetAccessWall');
         }
 
         // The gviz endpoint answers errors with an HTML/JS payload rather
         // than a non-2xx status. Feeding that to the CSV parser would
         // produce convincing-looking garbage, so refuse it outright.
         if (!isCsvResponse && /^\s*(<!DOCTYPE|<html|\)\]\}')/i.test(bodyText)) {
-            throw new Error(
-                'The spreadsheet endpoint returned a non-CSV response — the sheet may be ' +
-                'restricted, empty, or the gviz endpoint has changed.'
-            );
+            throw new AppError('error.sheetNonCsvResponse');
         }
 
         await PipelineState.write({ phase: 'parsing' });

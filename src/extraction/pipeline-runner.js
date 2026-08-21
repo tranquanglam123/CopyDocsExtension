@@ -37,6 +37,7 @@
  */
 import { TIMING, WARNINGS, DOC_TYPES, TRANSPORTS, SESSION_KEYS, EXTRACTION_STATUS } from '../shared/constants.js';
 import { UrlTransformer } from '../core/document-url.js';
+import { AppError } from '../core/app-error.js';
 import { toExtractionTarget } from './targets.js';
 import { PolicyManager } from '../platform/net-rules.js';
 import { getActiveTab } from '../platform/tabs.js';
@@ -56,6 +57,20 @@ import { runTabNavPipeline } from './tabnav-pipeline.js';
 const PIPELINE_TIMEOUT_MS = TIMING.PIPELINE_TIMEOUT_MS;
 
 /**
+ * Shape an error for `platform/storage.js`'s `setExtractionError` (spec v3
+ * §5.3): an AppError's `code`/`params` survive the round trip through
+ * storage so a popup that recovers via `getExtractionStatus` can still
+ * translate it; a plain Error degrades to its raw `message` only.
+ * @param {Error} err
+ * @returns {{code?: string, params?: object, message: string}}
+ */
+function toStoredError(err) {
+    return err instanceof AppError
+        ? { code: err.code, params: err.params, message: err.message }
+        : { message: err.message };
+}
+
+/**
  * Full extraction pipeline. Dispatches to the fetch (Docs), swFetch
  * (Sheets), or tabNav (Docs fallback) transport via `dispatchTransport`,
  * based on `targets.js`'s `toExtractionTarget()`.
@@ -69,7 +84,7 @@ export async function runPipeline() {
     // call, indirectly, by overwriting it) will clean it up.
     const existing = await PipelineState.get();
     if (existing && (Date.now() - existing.startedAt) < PIPELINE_TIMEOUT_MS) {
-        throw new Error('extraction_in_progress');
+        throw new AppError('error.extractionInProgress');
     }
 
     // Mark extraction as in-progress
@@ -81,7 +96,7 @@ export async function runPipeline() {
 
     if (!isValid) {
         await setExtractionStatus(EXTRACTION_STATUS.ERROR);
-        throw new Error('Active tab is not a Google Docs/Sheets/Slides page.');
+        throw new AppError('error.notADocPage');
     }
 
     const docId = UrlTransformer.getDocId(tab.url);
@@ -89,18 +104,14 @@ export async function runPipeline() {
 
     if (!target) {
         await setExtractionStatus(EXTRACTION_STATUS.ERROR);
-        throw new Error(
-            type === DOC_TYPES.SLIDES
-                ? 'Google Slides is not supported yet.'
-                : 'Failed to build an extraction target for this URL.'
-        );
+        throw new AppError(type === DOC_TYPES.SLIDES ? 'error.slidesUnsupported' : 'error.noExtractionTarget');
     }
 
     try {
         const result = await dispatchTransport(tab, target, docId);
         return result;
     } catch (err) {
-        await setExtractionError(err.message);
+        await setExtractionError(toStoredError(err));
         // Belt-and-suspenders: whichever sub-pipeline threw is
         // responsible for its own cleanup in its `finally`, but make
         // sure nothing lingers regardless of where it threw from.
@@ -187,10 +198,7 @@ export async function runWatchdog() {
         );
     }
 
-    await setExtractionError(
-        'Extraction timed out and was recovered automatically. ' +
-        'Any blocked scripts on the tab have been restored.'
-    );
+    await setExtractionError(toStoredError(new AppError('error.watchdogRecovered')));
     await PipelineState.clear();
 }
 

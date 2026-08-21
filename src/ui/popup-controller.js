@@ -12,6 +12,8 @@
  */
 
 import { LOCAL_KEYS, EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES } from '../shared/constants.js';
+import { I18n } from '../shared/i18n.js';
+import { getStoredLanguage, setStoredLanguage, detectLanguage } from '../platform/language.js';
 import * as view from './popup-view.js';
 import * as exportsApi from './popup-exports.js';
 
@@ -22,15 +24,86 @@ let currentDocTitle = 'document';
 let currentDocType = null;
 let pollTimer = null;
 
+/**
+ * The last dynamic view rendered, so a language switch (spec v3 §5.5) can
+ * re-render exactly that state in the new language — without restarting
+ * polling, resetting button state, or touching `extractedData` — instead of
+ * guessing. `{kind: 'idle'}` means "nothing dynamic shown yet; the static
+ * [data-i18n] labels are enough."
+ */
+let currentView = { kind: 'idle' };
+
+/** @param {string} kind @param {object} [payload] */
+function setView(kind, payload = {}) {
+    currentView = { kind, payload };
+}
+
 function stepModeForTransport(transport) {
     return transport === TRANSPORTS.TAB_NAV ? 'tabnav' : 'fetch';
+}
+
+/**
+ * Turn an error-ish value into display text, preferring a translated
+ * message over a raw one: an AppError-shaped value (`{code, params}`, from
+ * background.js's structured response or a stored `{code, params, message}`
+ * — spec v3 §5.3) translates via `code`; anything else falls back to its
+ * own raw message, and only the caller-supplied fallback key is used if
+ * there is truly nothing to show. Degrade, never blank.
+ * @param {{code?: string, params?: object, message?: string}|Error|string|null|undefined} err
+ * @param {string} fallbackKey
+ * @returns {string}
+ */
+function errorText(err, fallbackKey) {
+    if (!err) return I18n.t(fallbackKey);
+    if (typeof err === 'string') return err;
+    if (typeof err.code === 'string') return I18n.t(err.code, err.params);
+    return err.message || I18n.t(fallbackKey);
 }
 
 /** Store the result and render it — shared by init recovery, polling recovery, and a live extraction. */
 function presentResult(data) {
     extractedData = data;
     view.setStepMode(stepModeForTransport(data.meta?.transport));
+    setView('result');
     view.renderExtractionResult(data);
+}
+
+// ── Language (spec v3 §5.2/§5.5) ───────────────────────────────────
+
+/** Load the persisted/detected language and apply it before the first render. */
+export async function initI18n() {
+    await I18n.init({ getStoredLanguage, detectLanguage, setStoredLanguage });
+    view.setSelectedLanguage(I18n.getLanguage());
+    view.applyStaticI18n();
+}
+
+/**
+ * Switch language and re-render immediately — no reopen (spec v3 §5.5).
+ * Re-renders only the currently-visible dynamic state (via `currentView`)
+ * with the same data, so an in-flight extraction's polling/timers and a
+ * displayed result's `extractedData` are both left completely untouched.
+ */
+export async function handleLanguageChange() {
+    await I18n.setLanguage(view.getSelectedLanguage());
+    view.applyStaticI18n();
+    rerenderCurrentView();
+}
+
+function rerenderCurrentView() {
+    const { kind, payload } = currentView;
+    switch (kind) {
+        case 'docDetected': view.renderDocDetected(payload.type, payload.url); break;
+        case 'notADoc': view.renderNotADoc(); break;
+        case 'slidesUnsupported': view.renderSlidesUnsupported(); break;
+        case 'initError': view.renderInitError(payload.message); break;
+        case 'recoveryRunning': view.renderRecoveryRunning(); break;
+        case 'result': view.renderExtractionResult(extractedData); break;
+        case 'failed': view.renderExtractionFailed(payload.message); break;
+        case 'extracting':
+            view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t(payload.detailKey));
+            break;
+        default: break; // 'idle' — nothing dynamic to redraw
+    }
 }
 
 // ── Embed-images toggle (spec §4.4) ────────────────────────────────
@@ -74,6 +147,7 @@ export async function init() {
             // can't be the reason the popup needed recovering — a popup
             // that had to poll back in almost certainly means the tabNav
             // fallback fired and navigated the tab out from under it.
+            setView('recoveryRunning');
             view.renderRecoveryRunning();
             startPolling();
             return;
@@ -89,14 +163,18 @@ export async function init() {
             if (response.data.type === DOC_TYPES.SLIDES) {
                 // D1: Slides has no working extraction path in P1 — don't
                 // let the user start a pipeline that can only fail.
+                setView('slidesUnsupported');
                 view.renderSlidesUnsupported();
             } else {
-                view.renderDocDetected(response.data.typeLabel, response.data.url);
+                setView('docDetected', { type: response.data.type, url: response.data.url });
+                view.renderDocDetected(response.data.type, response.data.url);
             }
         } else {
+            setView('notADoc');
             view.renderNotADoc();
         }
     } catch (err) {
+        setView('initError', { message: err.message });
         view.renderInitError(err.message);
     }
 }
@@ -113,7 +191,9 @@ export function startPolling() {
                 presentResult(resp.data);
             } else if (resp?.status === EXTRACTION_STATUS.ERROR) {
                 stopPolling();
-                view.renderExtractionFailed(resp.error || 'Check the browser console for details.');
+                const message = errorText(resp.error, 'error.checkStatusFallback');
+                setView('failed', { message });
+                view.renderExtractionFailed(message);
                 view.setExtractButtonDisabled(currentDocType === DOC_TYPES.SLIDES);
             }
         } catch { /* keep polling */ }
@@ -130,7 +210,7 @@ export async function handleExtract() {
     if (currentDocType === DOC_TYPES.SLIDES) {
         // Defensive — the button should already be disabled (see init()),
         // but never let this fall through to a pipeline that can't work.
-        view.showNotification('Google Slides not supported yet.', 'error');
+        view.showNotification(I18n.t('error.slidesUnsupported'), 'error');
         return;
     }
 
@@ -147,19 +227,19 @@ export async function handleExtract() {
 
     try {
         view.setStep(0);
-        view.setStatus('🔄', 'Extracting…', 'Validating document URL');
+        setView('extracting', { detailKey: 'popup.status.validating' });
+        view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t('popup.status.validating'));
         await delay(300);
 
         view.setStep(1);
-        if (currentDocType === DOC_TYPES.SHEETS) {
-            view.setStatus('🔄', 'Extracting…', 'Fetching spreadsheet data directly — no tab navigation needed');
-        } else {
-            view.setStatus('🔄', 'Extracting…', 'Fetching document HTML directly — no tab navigation needed');
-        }
+        const fetchingKey = currentDocType === DOC_TYPES.SHEETS ? 'popup.status.fetchingSheet' : 'popup.status.fetchingDoc';
+        setView('extracting', { detailKey: fetchingKey });
+        view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t(fetchingKey));
         await delay(300);
 
         view.setStep(2);
-        view.setStatus('🔄', 'Extracting…', 'Parsing document formatting');
+        setView('extracting', { detailKey: 'popup.status.parsing' });
+        view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t('popup.status.parsing'));
 
         startPolling();
 
@@ -168,7 +248,7 @@ export async function handleExtract() {
         stopPolling();
 
         if (!response?.success) {
-            throw new Error(response?.error || 'Extraction failed.');
+            throw new Error(errorText({ code: response?.code, params: response?.params, message: response?.error }, 'error.extractionFailed'));
         }
 
         // Every fetch tier may have failed, in which case the background
@@ -182,6 +262,7 @@ export async function handleExtract() {
     } catch (err) {
         stopPolling();
         console.error('[Popup]', err);
+        setView('failed', { message: err.message });
         view.renderExtractionFailed(err.message);
         view.showNotification(err.message, 'error');
         view.setExtractButtonDisabled(false);
@@ -195,11 +276,11 @@ export async function handleCopy() {
 
     const mode = await exportsApi.copyRichContent(extractedData.html, extractedData.text);
     if (mode === 'rich') {
-        view.showNotification('Copied with formatting! Paste into Google Docs or Word.', 'success');
+        view.showNotification(I18n.t('popup.notify.copyRich'), 'success');
     } else if (mode === 'plain') {
-        view.showNotification('Copied as plain text (rich copy not supported here).', 'info');
+        view.showNotification(I18n.t('popup.notify.copyPlain'), 'info');
     } else {
-        view.showNotification('Copied as plain text (fallback).', 'info');
+        view.showNotification(I18n.t('popup.notify.copyFallback'), 'info');
     }
 }
 
@@ -214,9 +295,9 @@ export async function handleNewDoc() {
     // Then open a new Google Doc
     try {
         await chrome.runtime.sendMessage({ action: 'openNewDoc' });
-        view.showNotification('New doc opened! Press Ctrl+V to paste your formatted content.', 'info');
+        view.showNotification(I18n.t('popup.notify.newDocOpened'), 'info');
     } catch (err) {
-        view.showNotification(`Could not open new doc: ${err.message}`, 'error');
+        view.showNotification(I18n.t('popup.notify.newDocFailed', { message: err.message }), 'error');
     }
 }
 
@@ -229,10 +310,10 @@ export async function handleDownloadDocx() {
 
     try {
         await exportsApi.downloadDocx(extractedData.bodyHtml, extractedData.title || currentDocTitle, filename);
-        view.showNotification(`Downloading "${filename}" — opens in Word & Google Docs!`, 'success');
+        view.showNotification(I18n.t('popup.notify.docxDownloading', { filename }), 'success');
     } catch (err) {
         console.error('[Popup] DOCX generation error:', err);
-        view.showNotification(`Download failed: ${err.message}`, 'error');
+        view.showNotification(I18n.t('popup.notify.docxFailed', { message: err.message }), 'error');
     }
 }
 
@@ -245,9 +326,9 @@ export async function handleDownloadTxt() {
 
     try {
         await exportsApi.downloadTxt(extractedData.text, filename, 'text/plain');
-        view.showNotification(`Downloading "${filename}"`, 'success');
+        view.showNotification(I18n.t('popup.notify.txtDownloading', { filename }), 'success');
     } catch (err) {
-        view.showNotification(`Download failed: ${err.message}`, 'error');
+        view.showNotification(I18n.t('popup.notify.txtFailed', { message: err.message }), 'error');
     }
 }
 

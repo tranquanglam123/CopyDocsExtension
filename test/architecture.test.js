@@ -120,11 +120,20 @@ describe('layer purity', () => {
         }
     });
 
-    test('shared/ is the bottom of the graph: no chrome.*, no imports', () => {
+    test('shared/ is the bottom of the graph: no chrome.*, no imports from other layers', () => {
+        // An earlier version of this rule banned *every* import in shared/,
+        // which is stricter than the intent. shared/ being "the bottom" means
+        // nothing above it may be pulled in — not that i18n.js is forbidden
+        // from loading its own locale dictionaries. The blunt version pushed
+        // a real workaround into the source (a dynamic `import()` chosen to
+        // dodge this regex), which is the test shaping the code rather than
+        // guarding it.
+        const otherLayers = /(core|platform|extraction|services|entry|ui|popup|background|content|offscreen)\//;
         for (const file of SHARED) {
-            const src = code(read(file));
-            assert.ok(!/\bchrome\s*\./.test(src), `${file} calls chrome.*`);
-            assert.ok(!/^\s*import\s/m.test(read(file)), `${file} imports something`);
+            assert.ok(!/\bchrome\s*\./.test(code(read(file))), `${file} calls chrome.*`);
+            for (const spec of [...read(file).matchAll(/import\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1])) {
+                assert.ok(!otherLayers.test(spec), `${file} imports ${spec} — shared/ sits below every layer`);
+            }
         }
     });
 });

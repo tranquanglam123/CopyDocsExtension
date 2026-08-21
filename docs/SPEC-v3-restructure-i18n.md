@@ -92,12 +92,12 @@ src/
     style-fill.js
     container-score.js
     csv-to-html.js
-    docx-generator.js
     mini-zip.js
   ui/               # popup logic, split from its entry
     popup-view.js
     popup-controller.js
     popup-exports.js
+    docx-generator.js   # parses with DOMParser, so it cannot live in core/
   shared/
     constants.js
     i18n.js
@@ -286,7 +286,7 @@ re-renders immediately — no reopen. It must not disturb an in-flight extractio
 | `lib/style-fill.js` | `src/core/style-fill.js` |
 | `lib/container-score.js` | `src/core/container-score.js` |
 | `lib/csv-to-html.js` | `src/core/csv-to-html.js` |
-| `lib/docx-generator.js` | `src/core/docx-generator.js` |
+| `lib/docx-generator.js` | `src/ui/docx-generator.js` — it parses with `DOMParser`, so it fails the "core/ is node-testable" rule and belongs where a DOM exists |
 | `lib/mini-zip.js` | `src/core/mini-zip.js` |
 | `lib/transport.js` `detectWall`/`isImageContentType` | `src/core/wall-detector.js` |
 | `lib/transport.js` HTML tiers | `src/extraction/http-transport.js` |

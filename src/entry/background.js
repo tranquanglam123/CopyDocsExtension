@@ -13,6 +13,7 @@ import { getExtractionState } from '../platform/storage.js';
 import { runPipeline, runWatchdog, startupSweep, handleTabRemoved } from '../extraction/pipeline-runner.js';
 import { handleContentReady } from '../extraction/tabnav-pipeline.js';
 
+const errorResponse = (err) => ({ success: false, error: err.message, code: typeof err.code === 'string' ? err.code : undefined, params: err.params }); // AppError's code/params (duck-typed) so the popup can translate; a plain Error still degrades to its raw message
 /** @returns {Promise<object>} */
 async function checkTab() {
     const tab = await getActiveTab();
@@ -43,7 +44,7 @@ async function handleMessage(message, sender, sendResponse) {
                 try {
                     sendResponse({ success: true, data: await runPipeline() });
                 } catch (err) {
-                    sendResponse({ success: false, error: err.message });
+                    sendResponse(errorResponse(err));
                 }
                 break;
 
@@ -70,7 +71,7 @@ async function handleMessage(message, sender, sendResponse) {
                     );
                     sendResponse({ success: true, downloadId });
                 } catch (err) {
-                    sendResponse({ success: false, error: err.message });
+                    sendResponse(errorResponse(err));
                 }
                 break;
 
@@ -84,7 +85,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
     } catch (err) {
         console.error('[background]', err);
-        sendResponse({ success: false, error: err.message });
+        sendResponse(errorResponse(err));
     }
 }
 

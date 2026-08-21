@@ -1,138 +1,79 @@
-# 📋 CopyDocExt
+# CopyDocExt
 
-**Extract content from restricted Google Docs, Sheets, and Slides.**
+Vietnamese: [README.vi.md](README.vi.md)
 
-When a Google document has download/copy restrictions enabled, this extension bypasses those restrictions by navigating to the document's mobile view (`/mobilebasic`) with JavaScript disabled, extracting the content with formatting preserved.
+A Chrome extension that extracts content from Google Docs and Sheets with
+copy/download restricted, so you can read, paste, or save documents you
+already have access to.
 
----
+## How it works
 
-## ✨ Features
+CopyDocExt fetches the document's `/mobilebasic` page (Docs) or CSV export
+(Sheets) directly, using your own logged-in Google session — the same
+request your browser already makes, just not through the blocked File >
+Download menu. No tab navigation, no disabling JavaScript. Only if every
+fetch fails does it fall back to the old tab-navigation method, which
+currently fails on most documents: Google redirects a script-blocked tab to a cookie-help page instead.
 
-- **Copy with formatting** — Paste into Google Docs or Word with bold, headings, tables preserved
-- **Open in New Doc** — One-click: copies content → opens a blank Google Doc → you press Ctrl+V
-- **Download .docx** — Proper Office 2007+ Word document with formatting
-- **Download .txt** — Plain text fallback
-- **Popup recovery** — If the popup closes during extraction, just re-click the icon to see your results
+## Install
 
----
+There is no installer — load the source directly, in developer mode:
 
-## 🚀 Installation
+1. Download or clone this repository.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked**, select the folder containing `manifest.json`.
+4. If the icon isn't visible, pin it from the puzzle-piece menu.
 
-### Option 1: Quick Install (Windows)
+## Use
 
-1. Download or clone this repository
-2. Double-click **`install.bat`** — it will open Chrome's extension page for you
-3. Follow the on-screen instructions (also shown below)
+1. Open a restricted Google Doc or Sheet, click the icon, then **Extract Content**.
+2. Export the result:
+   - **Copy** — formatted HTML to the clipboard, for Docs, Word, or any
+     rich text editor.
+   - **New Doc** — copies content, opens a blank Google Doc; press Ctrl+V.
+   - **.docx** — a Word document with formatting; images not included
+     yet, use Copy or New Doc for those.
+   - **.txt** — plain text.
 
-### Option 2: Manual Install (Any OS)
+If the popup closes mid-extraction, click the icon again — the result is still there. The footer switches the interface between English and Vietnamese.
 
-1. **Download** this repository — click the green **Code** button → **Download ZIP**, then unzip it  
-   *Or* clone with git: `git clone https://github.com/YOUR_USERNAME/CopyDocExt.git`
+## Limits
 
-2. Open **Google Chrome** and go to:
-   ```
-   chrome://extensions
-   ```
+Properties of the source document, not shortcuts in the extension:
+- Equations and drawings are already rendered as pictures in Google's own
+  HTML, so they arrive as images, not editable text or equations — and
+  text drawn inside a picture cannot be recovered as selectable text.
+- Only the first sheet of a spreadsheet is read.
+- Google Slides is not supported — no reliable server-rendered path
+  exists for it yet.
 
-3. Enable **Developer mode** — toggle the switch in the top-right corner
+## Troubleshooting
 
-4. Click **"Load unpacked"** (top-left button)
+| Problem | Cause |
+|---|---|
+| "Not a Google Doc" | Current tab isn't a `docs.google.com` document or sheet. |
+| Extraction fails after a long wait | Fetch failed and it fell back to tab navigation, which Google blocks on most documents. |
+| .docx has no images | Expected for now — use Copy or New Doc instead. |
 
-5. Select the **CopyDocExt** folder (the one containing `manifest.json`)
+## Privacy
 
-6. ✅ Done! You'll see the CopyDocExt icon in your toolbar. If it's hidden, click the puzzle piece icon 🧩 and pin it.
+CopyDocExt sends nothing anywhere. It fetches from `docs.google.com` using
+your own existing session, the same access your browser already has.
+Parsing, formatting, and file generation all happen locally — no telemetry, no third-party server.
 
----
-
-## 📖 How to Use
-
-### Step 1: Open a restricted Google Doc
-
-Navigate to any Google Doc, Sheet, or Slide that has download/copy restrictions.
-
-### Step 2: Click the extension icon
-
-Click the **CopyDocExt** icon in your Chrome toolbar. The popup will show whether a valid document was detected.
-
-### Step 3: Extract content
-
-Click **"Extract Content"**. The extension will:
-- Block JavaScript on the tab
-- Navigate to the mobile view (`/mobilebasic`)
-- Extract all text with formatting
-- Restore JavaScript
-
-> **Note:** The popup may close briefly during navigation. Just click the icon again — your results will be there.
-
-### Step 4: Export your content
-
-Choose one of the four export options:
-
-| Button | What it does |
-|--------|-------------|
-| **Copy** | Copies with formatting — paste into Google Docs, Word, or any rich text editor |
-| **New Doc** | Copies content + opens a blank Google Doc. Press **Ctrl+V** to paste |
-| **.docx** | Downloads a Word document with formatting (headings, bold, tables) |
-| **.txt** | Downloads plain text |
-
----
-
-## ❓ Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Extension icon not visible | Click the puzzle piece 🧩 in Chrome toolbar → Pin CopyDocExt |
-| "Not a Google Doc" error | Make sure you're on a `docs.google.com` page |
-| Extraction times out | The document may be very large — try again, or check your internet connection |
-| Popup closed during extraction | Just click the icon again — results are saved automatically |
-| .docx won't open | Try opening with Google Docs (upload to Drive) or LibreOffice |
-
----
-
-## 🔒 Privacy
-
-This extension:
-- **Does NOT send any data** to external servers
-- **Does NOT collect** any personal information
-- Works **entirely offline** after installation
-- Only activates on `docs.google.com` pages
-
----
-
-## 📁 Project Structure
+## Project structure
 
 ```
-CopyDocExt/
-├── manifest.json            # Extension configuration
-├── background/
-│   └── service-worker.js    # Orchestrator (extraction pipeline)
-├── content/
-│   └── content-script.js    # DOM scanner (extracts formatted text)
-├── popup/
-│   ├── popup.html           # Popup UI
-│   ├── popup.css            # Dark theme styles
-│   └── popup.js             # UI logic, clipboard, downloads
-├── lib/
-│   ├── url-transformer.js   # URL manipulation utility
-│   ├── mini-zip.js          # Pure-JS ZIP creator (no dependencies)
-│   └── docx-generator.js    # HTML → Office Open XML converter
-├── icons/                   # Extension icons
-├── rules/                   # Declarative net request rules
-├── install.bat              # Windows quick-install helper
-├── LICENSE                  # MIT License
-└── README.md                # This file
+manifest.json
+src/
+  entry/       background, content script, popup, offscreen — wiring only
+  extraction/  fetch pipelines, transports, image embedding
+  platform/    the only layer that calls chrome.* APIs
+  core/        pure logic — URL parsing, sanitizing, CSV/zip helpers
+  ui/          popup view, controller, export handlers, docx generator
+  shared/      constants used across layers
 ```
 
----
+## License
 
-## 📄 License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
-
-Free for personal and educational use.
-
----
-
-## ⚠️ Disclaimer
-
-This tool is intended for **personal and educational use only**. Please respect content creators' rights and your organization's policies when using this extension. The authors are not responsible for any misuse.
+MIT — see [LICENSE](LICENSE).

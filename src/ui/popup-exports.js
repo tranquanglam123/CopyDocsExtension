@@ -19,6 +19,7 @@
  */
 
 import { DocxGenerator } from './docx-generator.js';
+import { I18n } from '../shared/i18n.js';
 
 // ── Copy with formatting ─────────────────────────────────────────
 
@@ -110,7 +111,7 @@ export async function downloadTxt(text, filename, mimeType = 'text/plain') {
         mimeType,
     });
     if (!resp?.success) {
-        throw new Error(resp?.error || 'Download failed.');
+        throw new Error(resp?.error || I18n.t('error.downloadFailed'));
     }
 }
 

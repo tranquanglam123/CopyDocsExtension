@@ -399,8 +399,31 @@ body {
 /* ─── Footer ────────────────────────────────────────────────────── */
 
 .popup-footer {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   font-size: 10px;
   color: var(--text-muted);
   padding-top: 2px;
+}
+
+/* Compact language selector (spec v3 §5.5), same dark theme as the rest. */
+.lang-select {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-family: inherit;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.lang-select:hover,
+.lang-select:focus {
+  color: var(--text-primary);
+  border-color: var(--accent-indigo);
+  outline: none;
 }
