@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CopyDocExt",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Download & copy content from restricted Google Docs, Sheets, and Slides.",
   "icons": {
     "16": "icons/icon16.png",
@@ -28,7 +28,9 @@
     "downloads",
     "declarativeNetRequest",
     "notifications",
-    "storage"
+    "storage",
+    "offscreen",
+    "alarms"
   ],
   "host_permissions": [
     "*://docs.google.com/*"
@@ -43,14 +45,5 @@
       ],
       "run_at": "document_idle"
     }
-  ],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "block_js",
-        "enabled": false,
-        "path": "rules/block-js-rule.json"
-      }
-    ]
-  }
+  ]
 }

@@ -31,26 +31,71 @@ const btnDownloadTxt = document.getElementById('btn-download-txt');
 const notification = document.getElementById('notification');
 const notificationText = document.getElementById('notification-text');
 
+const warningsBanner = document.getElementById('warnings-banner');
+const warningsText = document.getElementById('warnings-text');
+
 // ── State ────────────────────────────────────────────────────────
 
 let extractedData = null;
 let currentDocTitle = 'document';
+let currentDocType = null;
 let pollTimer = null;
 
-// ── Step IDs ────────────────────────────────────────────────────
+// ── Warnings (meta.warnings from the extraction result) ───────────
+// Never silent: an unrecognized warning code still renders verbatim
+// instead of being swallowed.
 
-const STEPS = ['step-validate', 'step-block', 'step-navigate', 'step-extract', 'step-done'];
+const WARNING_MESSAGES = {
+    single_sheet_only: 'Only the first sheet was read (gid=0) — other sheets in this spreadsheet were not extracted.',
+    low_confidence: 'Low-confidence extraction — the result may be incomplete.',
+    multi_tab_partial: 'Multi-tab doc: only the first tab was extracted.',
+    tabnav_fallback: 'Direct fetch failed, so the extension fell back to the legacy method — your tab may have briefly navigated to the mobile view.',
+};
+
+function showWarnings(warnings) {
+    if (!warnings || warnings.length === 0) {
+        warningsBanner.classList.add('hidden');
+        warningsText.textContent = '';
+        return;
+    }
+    warningsText.textContent = warnings.map((w) => WARNING_MESSAGES[w] || w).join(' ');
+    warningsBanner.classList.remove('hidden');
+}
+
+// ── Step IDs ────────────────────────────────────────────────────
+// Two sequences, matching what actually happens. The fetch transport
+// (T1 swFetch / T2 csFetch — spec §3.2, pulled forward from P3) never
+// touches the tab, so there's no "Block JS" / "Navigate" step to show for
+// it. tabNav is now a last-resort fallback only, kept for when it fires
+// (see background/service-worker.js dispatchTransport).
+
+const STEPS_FETCH = ['step-validate', 'step-fetch', 'step-parse', 'step-done'];
+const STEPS_TABNAV = ['step-validate', 'step-block', 'step-navigate', 'step-extract', 'step-done'];
+const ALL_STEP_IDS = [...new Set([...STEPS_FETCH, ...STEPS_TABNAV])];
+
+let activeSteps = STEPS_FETCH;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/**
+ * Switch which step sequence is visible in the progress bar.
+ * @param {'fetch'|'tabnav'} mode
+ */
+function setStepMode(mode) {
+    activeSteps = mode === 'tabnav' ? STEPS_TABNAV : STEPS_FETCH;
+    ALL_STEP_IDS.forEach((id) => {
+        document.getElementById(id).classList.toggle('hidden', !activeSteps.includes(id));
+    });
+}
+
 function setStep(stepIndex) {
-    STEPS.forEach((id, i) => {
+    activeSteps.forEach((id, i) => {
         const el = document.getElementById(id);
         el.classList.remove('active', 'done');
         if (i < stepIndex) el.classList.add('done');
         if (i === stepIndex) el.classList.add('active');
     });
-    progressFill.style.width = `${(stepIndex / (STEPS.length - 1)) * 100}%`;
+    progressFill.style.width = `${(stepIndex / (activeSteps.length - 1)) * 100}%`;
 }
 
 function showNotification(text, type = 'info') {
@@ -73,13 +118,14 @@ function setStatus(icon, title, detail, cardClass) {
 function showExtractionResult(data) {
     extractedData = data;
     progressSection.classList.remove('hidden');
-    setStep(4);
+    setStep(activeSteps.length - 1);
     setStatus(
         '✅',
         'Extraction Complete',
         `${data.charCount.toLocaleString()} characters extracted`,
         'valid'
     );
+    showWarnings(data.meta?.warnings);
     actionsExport.classList.remove('hidden');
     btnExtract.disabled = true;
     showNotification(`"${data.title}" ready — copy, open in new doc, or download!`, 'success');
@@ -98,12 +144,18 @@ async function init() {
         const statusResp = await chrome.runtime.sendMessage({ action: 'getExtractionStatus' });
 
         if (statusResp?.status === 'complete' && statusResp.data) {
+            setStepMode(statusResp.data.meta?.transport === 'tabNav' ? 'tabnav' : 'fetch');
             showExtractionResult(statusResp.data);
             return;
         }
 
         if (statusResp?.status === 'running') {
             progressSection.classList.remove('hidden');
+            // The fetch transport (T1/T2) never navigates the tab, so it
+            // can't be the reason the popup needed recovering — a popup
+            // that had to poll back in almost certainly means the tabNav
+            // fallback fired and navigated the tab out from under it.
+            setStepMode('tabnav');
             setStep(2);
             setStatus('🔄', 'Extracting…', 'Waiting for content extraction…');
             btnExtract.disabled = true;
@@ -116,13 +168,27 @@ async function init() {
 
         if (response?.success && response.data.isValid) {
             currentDocTitle = response.data.title || 'document';
-            setStatus(
-                '✅',
-                `${response.data.typeLabel} detected`,
-                truncateUrl(response.data.url),
-                'valid'
-            );
-            btnExtract.disabled = false;
+            currentDocType = response.data.type;
+
+            if (response.data.type === 'slides') {
+                // D1: Slides has no working extraction path in P1 — don't
+                // let the user start a pipeline that can only fail.
+                setStatus(
+                    '🚧',
+                    'Google Slides not supported yet',
+                    'Slides extraction isn\'t available in this version — try a Doc or Sheet instead.',
+                    'invalid'
+                );
+                btnExtract.disabled = true;
+            } else {
+                setStatus(
+                    '✅',
+                    `${response.data.typeLabel} detected`,
+                    truncateUrl(response.data.url),
+                    'valid'
+                );
+                btnExtract.disabled = false;
+            }
         } else {
             setStatus('❌', 'Not a Google Doc', 'Navigate to a Google Doc, Sheet, or Slide.', 'invalid');
             btnExtract.disabled = true;
@@ -142,11 +208,12 @@ function startPolling() {
             const resp = await chrome.runtime.sendMessage({ action: 'getExtractionStatus' });
             if (resp?.status === 'complete' && resp.data) {
                 stopPolling();
+                setStepMode(resp.data.meta?.transport === 'tabNav' ? 'tabnav' : 'fetch');
                 showExtractionResult(resp.data);
             } else if (resp?.status === 'error') {
                 stopPolling();
-                setStatus('❌', 'Extraction Failed', 'Check the browser console for details.', 'invalid');
-                btnExtract.disabled = false;
+                setStatus('❌', 'Extraction Failed', resp.error || 'Check the browser console for details.', 'invalid');
+                btnExtract.disabled = (currentDocType !== 'slides') ? false : true;
             }
         } catch { /* keep polling */ }
     }, 1000);
@@ -159,10 +226,27 @@ function stopPolling() {
 // ── Extract ──────────────────────────────────────────────────────
 
 async function handleExtract() {
+    if (currentDocType === 'slides') {
+        // Defensive — the button should already be disabled (see init()),
+        // but never let this fall through to a pipeline that can't work.
+        showNotification('Google Slides not supported yet.', 'error');
+        return;
+    }
+
     btnExtract.disabled = true;
     progressSection.classList.remove('hidden');
     actionsExport.classList.add('hidden');
     notification.classList.add('hidden');
+    warningsBanner.classList.add('hidden');
+
+    // Docs and Sheets both default to a transport that never touches the
+    // tab now (Docs: swFetch/csFetch, spec §3.2; Sheets: swFetch,
+    // unchanged) — the tab is never navigated, and the popup gets its
+    // result straight from this one response instead of via a
+    // navigation-triggered close/reopen. tabNav only runs as an explicit
+    // last-resort fallback if every fetch tier fails; if it does, we
+    // switch the display below once we know.
+    setStepMode('fetch');
 
     try {
         setStep(0);
@@ -170,11 +254,15 @@ async function handleExtract() {
         await delay(300);
 
         setStep(1);
-        setStatus('🔄', 'Extracting…', 'Blocking JavaScript on tab');
+        if (currentDocType === 'sheets') {
+            setStatus('🔄', 'Extracting…', 'Fetching spreadsheet data directly — no tab navigation needed');
+        } else {
+            setStatus('🔄', 'Extracting…', 'Fetching document HTML directly — no tab navigation needed');
+        }
         await delay(300);
 
         setStep(2);
-        setStatus('🔄', 'Extracting…', 'Navigating to mobile view — popup may close briefly');
+        setStatus('🔄', 'Extracting…', 'Parsing document formatting');
 
         startPolling();
 
@@ -184,6 +272,16 @@ async function handleExtract() {
 
         if (!response?.success) {
             throw new Error(response?.error || 'Extraction failed.');
+        }
+
+        if (response.data?.meta?.transport === 'tabNav') {
+            // Every fetch tier failed and the background pipeline fell
+            // back to the legacy block-JS + navigate path (meta.warnings
+            // carries 'tabnav_fallback', surfaced via the warnings banner
+            // below). The extraction has already finished by the time we
+            // learn this, so just switch to the matching 5-step layout
+            // before showing the result.
+            setStepMode('tabnav');
         }
 
         showExtractionResult(response.data);

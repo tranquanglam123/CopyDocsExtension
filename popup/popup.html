@@ -42,22 +42,36 @@
       </div>
     </section>
 
-    <!-- Progress Section (hidden until extraction starts) -->
+    <!-- Progress Section (hidden until extraction starts).
+         Two step sequences share this bar — popup.js shows/hides them via
+         setStepMode() so only one is visible at a time:
+           - fetch transport (Docs swFetch/csFetch, Sheets swFetch): the
+             tab is never touched, so it's Validate → Fetch → Parse → Done.
+           - tabNav (legacy, now a last-resort fallback only): the original
+             5-step Validate → Block JS → Navigate → Extract → Done. -->
     <section id="progress-section" class="card progress-section hidden">
       <div class="progress-steps">
         <div class="step" id="step-validate" data-step="1">
           <span class="step-dot"></span>
           <span class="step-label">Validate</span>
         </div>
-        <div class="step" id="step-block" data-step="2">
+        <div class="step" id="step-fetch" data-step="2">
+          <span class="step-dot"></span>
+          <span class="step-label">Fetch</span>
+        </div>
+        <div class="step" id="step-parse" data-step="3">
+          <span class="step-dot"></span>
+          <span class="step-label">Parse</span>
+        </div>
+        <div class="step hidden" id="step-block" data-step="2">
           <span class="step-dot"></span>
           <span class="step-label">Block JS</span>
         </div>
-        <div class="step" id="step-navigate" data-step="3">
+        <div class="step hidden" id="step-navigate" data-step="3">
           <span class="step-dot"></span>
           <span class="step-label">Navigate</span>
         </div>
-        <div class="step" id="step-extract" data-step="4">
+        <div class="step hidden" id="step-extract" data-step="4">
           <span class="step-dot"></span>
           <span class="step-label">Extract</span>
         </div>
@@ -69,6 +83,14 @@
       <div class="progress-bar">
         <div id="progress-fill" class="progress-fill"></div>
       </div>
+    </section>
+
+    <!-- Warnings banner — driven by extraction result meta.warnings.
+         Never hidden silently: any warning code the popup doesn't
+         recognize is still shown verbatim (see popup.js). -->
+    <section id="warnings-banner" class="card warnings-banner hidden">
+      <span class="warnings-icon">⚠️</span>
+      <span id="warnings-text" class="warnings-text"></span>
     </section>
 
     <!-- Primary action -->
@@ -140,7 +162,7 @@
 
     <!-- Footer -->
     <footer class="popup-footer">
-      <span>v1.1.0</span>
+      <span>v2.0.0</span>
     </footer>
   </div>
 

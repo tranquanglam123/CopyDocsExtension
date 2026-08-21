@@ -291,6 +291,30 @@ body {
   color: var(--text-primary);
 }
 
+/* ─── Warnings Banner ───────────────────────────────────────────── */
+/* meta.warnings from the extraction result (e.g. single_sheet_only) —
+   always yellow/amber, distinct from the red/green notification toast. */
+
+.warnings-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.warnings-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.warnings-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
 /* ─── Notification ──────────────────────────────────────────────── */
 
 .notification {

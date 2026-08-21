@@ -29,7 +29,7 @@
             'nav', 'header', 'footer',
             '[role="navigation"]',
             '[role="banner"]',
-            '.gb_', '#gb',
+            '[class^="gb_"]', '[class*=" gb_"]', '#gb',
             '.docs-butterbar',
             '.docs-companion',
             'script', 'style', 'noscript',
@@ -230,6 +230,82 @@ ${bodyHtml}
         }
 
         /**
+         * Readiness detector (fixes D5 — replaces the fixed `setTimeout(500)`).
+         *
+         * Watches `document.body` with a `MutationObserver` and polls
+         * `document.body.textContent.length` every 250ms. The page is
+         * considered ready once the text length is unchanged AND no
+         * mutation was observed across 2 consecutive polls. A minimum
+         * wait of 300ms is always honored (even an instantly-static page
+         * gets at least two stable polls), and a hard cap of 10s guarantees
+         * we never wait forever on a page that keeps mutating.
+         *
+         * Legacy `tabNav` path only — spec §4.4.
+         *
+         * @returns {Promise<void>}
+         */
+        static waitForReady() {
+            return new Promise((resolve) => {
+                const POLL_MS = 250;
+                const MIN_WAIT_MS = 300;
+                const HARD_CAP_MS = 10000;
+
+                const start = Date.now();
+                let lastLength = -1;
+                let stableCount = 0;
+                let mutatedSinceLastPoll = true; // unsettled until proven otherwise
+                let settled = false;
+                let pollTimer = null;
+                let observer = null;
+
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    if (pollTimer) clearInterval(pollTimer);
+                    if (observer) observer.disconnect();
+                    resolve();
+                };
+
+                const check = () => {
+                    const elapsed = Date.now() - start;
+                    const length = document.body ? document.body.textContent.length : 0;
+                    const mutated = mutatedSinceLastPoll;
+                    mutatedSinceLastPoll = false;
+
+                    if (elapsed >= HARD_CAP_MS) {
+                        finish();
+                        return;
+                    }
+
+                    if (length === lastLength && !mutated) {
+                        stableCount += 1;
+                    } else {
+                        stableCount = 0;
+                        lastLength = length;
+                    }
+
+                    if (elapsed >= MIN_WAIT_MS && stableCount >= 2) {
+                        finish();
+                    }
+                };
+
+                if (typeof MutationObserver !== 'undefined' && document.body) {
+                    observer = new MutationObserver(() => {
+                        mutatedSinceLastPoll = true;
+                    });
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        characterData: true,
+                        attributes: true,
+                    });
+                }
+
+                pollTimer = setInterval(check, POLL_MS);
+            });
+        }
+
+        /**
          * Extract structured content from the page.
          * @returns {{ title: string, text: string, html: string, bodyHtml: string, charCount: number }}
          */
@@ -311,9 +387,21 @@ ${bodyHtml}
     });
 
     if (window.location.href.includes('/mobilebasic')) {
-        setTimeout(() => {
-            const result = DOMScanner.scan();
-            chrome.runtime.sendMessage({ action: 'contentReady', data: result });
-        }, 500);
+        DOMScanner.waitForReady().then(() => {
+            // Ship the raw markup, including <head>, so the offscreen parser
+            // can rebuild a real CSS cascade and recover Google's class-based
+            // formatting (D2). The in-page DOMScanner above stays as the
+            // fallback the service worker asks for via { action: 'extract' }
+            // when the offscreen parse fails.
+            chrome.runtime.sendMessage({
+                action: 'contentReady',
+                data: {
+                    rawHtml: document.documentElement.outerHTML,
+                    title: document.title,
+                    url: window.location.href,
+                    docType: 'docs',
+                },
+            });
+        });
     }
 })();
