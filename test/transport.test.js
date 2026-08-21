@@ -10,7 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectWall } from '../lib/transport.js';
+import { detectWall } from '../src/extraction/http-transport.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 

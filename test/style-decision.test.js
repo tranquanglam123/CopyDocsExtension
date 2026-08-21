@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { StyleDecision } from '../lib/style-decision.js';
+import { StyleDecision } from '../src/core/style-decision.js';
 
 // This is the D2 decision-logic coverage: given values as they'd come back
 // from getComputedStyle() (numeric weight strings, resolved keywords),

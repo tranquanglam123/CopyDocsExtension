@@ -25,7 +25,7 @@
  * Losing an image must never lose the document.
  */
 
-import { fetchBinary, isImageContentType } from './transport.js';
+import { fetchBinary, isImageContentType } from './http-transport.js';
 
 export class ImageEmbedder {
 

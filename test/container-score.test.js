@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { ContainerScore } from '../lib/container-score.js';
+import { ContainerScore } from '../src/core/container-score.js';
 
 // Pure scoring logic for the structural container-detection fallback
 // (spec §4.3): score = textLength * (1 - linkDensity) * (1 + 0.1 * paragraphCount),

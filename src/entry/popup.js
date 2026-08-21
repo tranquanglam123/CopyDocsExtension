@@ -9,7 +9,7 @@
  * requires DOM APIs (DOMParser, Node, etc.) that don't exist in SW.
  */
 
-import { DocxGenerator } from '../lib/docx-generator.js';
+import { DocxGenerator } from '../core/docx-generator.js';
 
 // ── DOM references ───────────────────────────────────────────────
 

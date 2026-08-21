@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { StyleFill } from '../lib/style-fill.js';
+import { StyleFill } from '../src/core/style-fill.js';
 
 // This is the spec v2.1 §9 coverage: StyleFill is pure logic (plain
 // strings/objects, no DOM), so it is fully testable under `node --test`

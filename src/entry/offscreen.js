@@ -34,10 +34,10 @@
  * notes handed back to the orchestrator.
  */
 
-import { HtmlSanitize } from '../lib/html-sanitize.js';
-import { StyleDecision } from '../lib/style-decision.js';
-import { ContainerScore } from '../lib/container-score.js';
-import { StyleFill } from '../lib/style-fill.js';
+import { HtmlSanitize } from '../core/html-sanitize.js';
+import { StyleDecision } from '../core/style-decision.js';
+import { ContainerScore } from '../core/container-score.js';
+import { StyleFill } from '../core/style-fill.js';
 
 class OffscreenParser {
 

@@ -44,10 +44,10 @@
  *   path only) — no manual executeScript call needed.
  */
 
-import { UrlTransformer } from '../lib/url-transformer.js';
-import { parseCsv, csvToHtml } from '../lib/csv-to-html.js';
-import { fetchDocHtml } from '../lib/transport.js';
-import { ImageEmbedder } from '../lib/image-embedder.js';
+import { UrlTransformer } from '../core/document-url.js';
+import { parseCsv, csvToHtml } from '../core/csv-to-html.js';
+import { fetchDocHtml } from '../extraction/http-transport.js';
+import { ImageEmbedder } from '../extraction/image-embedder.js';
 
 
 // ─── PipelineState ──────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ ${bodyHtml}
 
 class OffscreenManager {
 
-    static DOCUMENT_URL = 'offscreen/parser.html';
+    static DOCUMENT_URL = 'src/entry/offscreen.html';
 
     /** Close the document after this much idle time. */
     static IDLE_CLOSE_MS = 30_000;
