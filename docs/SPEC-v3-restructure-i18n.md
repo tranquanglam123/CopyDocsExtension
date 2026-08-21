@@ -115,10 +115,22 @@ break. Each layer stays flat.
 
 ```
 entry → ui, extraction, platform, shared
-extraction → platform, core, shared
-platform → shared            (chrome.* allowed here and nowhere else)
-core → shared                (pure; no chrome.*, no window/document)
+ui    → platform, core, shared      (chrome.* allowed — it is a browser UI)
+extraction → platform, core, shared (chrome.* FORBIDDEN — go through platform)
+platform → shared                   (chrome.* allowed)
+core → shared                       (pure; no chrome.*, no window/document)
 ```
+
+An earlier draft said `chrome.*` was allowed only in `platform/` and `entry/`.
+That was written while the popup still lived in `entry/`; once it splits into
+`ui/`, its controller and export code necessarily call `chrome.storage`,
+`chrome.runtime.sendMessage` and `chrome.downloads`. Adding a
+`platform/popup-bridge.js` that forwards three calls would be ceremony, not
+isolation. The constraint worth enforcing is the one that buys testability:
+**`core/` and `extraction/` stay chrome-free**, because those are the layers
+`node --test` can actually exercise. `ui/` should still prefer a `platform/`
+wrapper where one already exists (storage keys in particular) rather than
+reaching for `chrome.*` directly.
 
 `core/` may be imported by anything; `core/` imports nothing but `shared/`.
 
@@ -296,7 +308,7 @@ Existing suites move with their subjects and must stay green throughout.
 New `test/architecture.test.js` — the structure is only real if it is enforced:
 
 - no file under `src/core/` contains `chrome.` or `document.` or `window.`;
-- no file outside `src/platform/` and `src/entry/` contains `chrome.`;
+- no file under `src/extraction/` or `src/shared/` contains `chrome.`;
 - `wrapAsDocument` is defined exactly once in the tree;
 - the literal strings for storage keys, warning codes and alarm names appear only
   in `src/shared/constants.js`;
@@ -318,7 +330,8 @@ New `test/i18n.test.js`:
 2. The extension still extracts the user's restricted Unit-1 document, still
    embeds its images, and pasting into Google Docs still reproduces the red
    header shading and orange borders — the v2.1 result must not regress.
-3. `chrome.` appears in no file outside `src/platform/` and `src/entry/`.
+3. `chrome.` appears in no file under `src/core/`, `src/extraction/` or
+   `src/shared/`; `core/` additionally contains no `document.` or `window.`.
 4. `wrapAsDocument` is defined once.
 5. Storage keys, warning codes and alarm names exist only in
    `src/shared/constants.js`.

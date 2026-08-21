@@ -8,9 +8,14 @@
  *   word/document.xml    ← the actual content
  *   word/_rels/document.xml.rels
  *   word/styles.xml      ← heading/body styles
+ *
+ * Lives in ui/ rather than core/ because it parses its input with `DOMParser`
+ * and therefore only runs where a DOM exists — in practice, the popup. core/ is
+ * reserved for modules `node --test` can exercise directly; this one cannot be.
+ * Its pure dependency, the ZIP writer, stays in core/mini-zip.js.
  */
 
-import { MiniZip } from './mini-zip.js';
+import { MiniZip } from '../core/mini-zip.js';
 
 export class DocxGenerator {
 

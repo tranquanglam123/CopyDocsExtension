@@ -38,6 +38,8 @@ import { HtmlSanitize } from '../core/html-sanitize.js';
 import { StyleDecision } from '../core/style-decision.js';
 import { ContainerScore } from '../core/container-score.js';
 import { StyleFill } from '../core/style-fill.js';
+import { wrapAsDocument } from '../core/html-document.js';
+import { WARNINGS, TIMING, STYLE_FILL_MAX_BYTES } from '../shared/constants.js';
 
 class OffscreenParser {
 
@@ -97,7 +99,7 @@ class OffscreenParser {
     static MIN_ACCEPTABLE_TEXT_LENGTH = 40;
 
     /** Max time to wait for the sandboxed iframe to finish loading srcdoc. */
-    static LOAD_TIMEOUT_MS = 10000;
+    static LOAD_TIMEOUT_MS = TIMING.SANDBOX_LOAD_TIMEOUT_MS;
 
     /**
      * Fixed width the sandbox iframe is set to before any `getComputedStyle`
@@ -114,7 +116,7 @@ class OffscreenParser {
      * computed-fill pass is dropped (authored styles only kept) rather than
      * silently truncating anything.
      */
-    static STYLE_FILL_SIZE_BUDGET_BYTES = 4 * 1024 * 1024; // 4 MB
+    static STYLE_FILL_SIZE_BUDGET_BYTES = STYLE_FILL_MAX_BYTES;
 
     // ─── Entry point ────────────────────────────────────────────────────
 
@@ -151,13 +153,13 @@ class OffscreenParser {
             const title = OffscreenParser._extractTitle(idoc, container);
             const text = OffscreenParser._extractPlainText(idoc, container);
             const { html: bodyHtml, warnings: styleWarnings } = OffscreenParser._extractBodyHtml(idoc, iwin, container);
-            const fullHtml = OffscreenParser.wrapAsDocument(bodyHtml, title);
+            const fullHtml = wrapAsDocument(bodyHtml, title);
             const charCount = text.length;
 
             const warnings = [...styleWarnings];
-            if (charCount === 0) warnings.push('empty_content');
-            if (method === 'structural-score') warnings.push('container_fallback_used');
-            if (method === 'body-fallback') warnings.push('container_not_found');
+            if (charCount === 0) warnings.push(WARNINGS.EMPTY_CONTENT);
+            if (method === 'structural-score') warnings.push(WARNINGS.CONTAINER_FALLBACK_USED);
+            if (method === 'body-fallback') warnings.push(WARNINGS.CONTAINER_NOT_FOUND);
 
             return {
                 title,
@@ -595,58 +597,10 @@ class OffscreenParser {
             // styles only) and say so, instead of cutting the HTML short.
             applyStyles(false);
             html = container.innerHTML || '';
-            warnings.push('style_fill_skipped_size');
+            warnings.push(WARNINGS.STYLE_FILL_SKIPPED_SIZE);
         }
 
         return { html, warnings };
-    }
-
-    // ─── Output wrapper (reused verbatim from the legacy DOMScanner) ────
-
-    /**
-     * Wrap cleaned HTML in a minimal document structure suitable for
-     * Word/Google Docs import / rich clipboard copy.
-     * @param {string} bodyHtml
-     * @param {string} title
-     * @returns {string}
-     */
-    static wrapAsDocument(bodyHtml, title) {
-        return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${OffscreenParser.escapeHtml(title)}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; max-width: 800px; margin: 20px auto; color: #222; }
-  h1 { font-size: 20pt; margin: 16pt 0 8pt; }
-  h2 { font-size: 16pt; margin: 14pt 0 6pt; }
-  h3 { font-size: 13pt; margin: 12pt 0 4pt; }
-  p { margin: 0 0 8pt; }
-  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
-  td, th { border: 1px solid #ccc; padding: 6px 8px; }
-  th { background: #f5f5f5; font-weight: bold; }
-  blockquote { border-left: 3px solid #ccc; margin: 8pt 0; padding: 4pt 12pt; color: #555; }
-  ul, ol { margin: 4pt 0 8pt 20pt; }
-  li { margin: 2pt 0; }
-</style>
-</head>
-<body>
-${bodyHtml}
-</body>
-</html>`;
-    }
-
-    /**
-     * Escape HTML entities in a string.
-     * @param {string} str
-     * @returns {string}
-     */
-    static escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
     }
 }
 

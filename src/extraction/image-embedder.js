@@ -25,18 +25,21 @@
  * Losing an image must never lose the document.
  */
 
-import { fetchBinary, isImageContentType } from './http-transport.js';
+import { IMAGE_LIMITS, WARNINGS, WARNING_PREFIXES } from '../shared/constants.js';
+import { fetchBinary } from './binary-transport.js';
+import { isImageContentType } from '../core/wall-detector.js';
+import { isEmbedImagesEnabled } from '../platform/storage.js';
 
 export class ImageEmbedder {
 
     /** Per-image decoded-size cap (spec §4.2). */
-    static PER_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+    static PER_IMAGE_MAX_BYTES = IMAGE_LIMITS.PER_IMAGE_MAX_BYTES;
 
     /** Total decoded-size budget across all images in one document (spec §4.2). */
-    static TOTAL_BUDGET_BYTES = 12 * 1024 * 1024;
+    static TOTAL_BUDGET_BYTES = IMAGE_LIMITS.TOTAL_BUDGET_BYTES;
 
     /** Max simultaneous in-flight image fetches (spec §4.2). */
-    static MAX_CONCURRENT = 4;
+    static MAX_CONCURRENT = IMAGE_LIMITS.MAX_CONCURRENT;
 
     /**
      * Per-image timeout applied here as well as inside the transport tiers
@@ -44,7 +47,7 @@ export class ImageEmbedder {
      * injects its own `fetchFn` (tests; or a future transport) can't stall
      * the whole embed pass just because it forgot to time out internally.
      */
-    static TIMEOUT_MS = 8000;
+    static TIMEOUT_MS = IMAGE_LIMITS.TIMEOUT_MS;
 
     // ─── Entry point ────────────────────────────────────────────────────
 
@@ -100,9 +103,9 @@ export class ImageEmbedder {
 
         const newBodyHtml = ImageEmbedder._applyOutcomes(bodyHtml, images, outcomes, stats);
 
-        if (stats.failed > 0) stats.warnings.push(`image_embed_failed:${stats.failed}`);
-        if (stats.notBitmap > 0) stats.warnings.push(`image_not_bitmap:${stats.notBitmap}`);
-        if (stats.budgetExceeded) stats.warnings.push('image_budget_exceeded');
+        if (stats.failed > 0) stats.warnings.push(`${WARNING_PREFIXES.IMAGE_EMBED_FAILED}:${stats.failed}`);
+        if (stats.notBitmap > 0) stats.warnings.push(`${WARNING_PREFIXES.IMAGE_NOT_BITMAP}:${stats.notBitmap}`);
+        if (stats.budgetExceeded) stats.warnings.push(WARNINGS.IMAGE_BUDGET_EXCEEDED);
 
         console.log(
             `[ImageEmbedder] ${stats.embedded}/${stats.totalFound} embedded ` +
@@ -342,4 +345,101 @@ export class ImageEmbedder {
             warnings: [],
         };
     }
+}
+
+// ─── embedImagesIntoResult — wire into a full extraction result ────────────
+// Moved from background/service-worker.js's `ExtensionController` (spec v3
+// P2). Shared by extraction/fetch-pipeline.js and
+// extraction/tabnav-pipeline.js — the two Docs pipelines whose parse
+// produces `bodyHtml`. Never used by csv-pipeline.js (csv-derived HTML has
+// no `<img>` tags to begin with).
+
+/**
+ * Embed the document's own `docs.google.com` images as `data:` URIs
+ * into `result.bodyHtml` (spec §4), honouring the popup's "Embed
+ * images" toggle (`isEmbedImagesEnabled`, platform/storage.js, default
+ * ON). Called after every offscreen parse that produces Docs `bodyHtml`
+ * — never for Sheets and never when the offscreen parse itself failed
+ * (nothing to embed into).
+ *
+ * `ImageEmbedder.embedImages` never throws — every fetch failure
+ * degrades to "keep the original src, add a warning" (spec §4.2) — so
+ * the try/catch here is defense in depth only, not the real safety net.
+ *
+ * @param {object} result   The parse-result contract ({title, text, html, bodyHtml, charCount, meta}).
+ * @param {number|undefined} tabId  The document's own tab — needed for the T2 csFetch fallback.
+ * @returns {Promise<object>} A new result object; `result` is not mutated.
+ */
+export async function embedImagesIntoResult(result, tabId) {
+    if (!result || typeof result.bodyHtml !== 'string' || result.bodyHtml.length === 0) {
+        return result;
+    }
+
+    const enabled = await isEmbedImagesEnabled();
+    if (!enabled) {
+        console.log('[ImageEmbedder] Image embedding is OFF (popup toggle) — leaving image URLs as-is.');
+        return result;
+    }
+
+    const oldBodyHtml = result.bodyHtml;
+    let embedResult;
+    try {
+        embedResult = await ImageEmbedder.embedImages(oldBodyHtml, {
+            tabId,
+            budgetBytes: ImageEmbedder.TOTAL_BUDGET_BYTES,
+        });
+    } catch (err) {
+        // Defense in depth only — embedImages is designed to never throw.
+        console.error('[ImageEmbedder] embedImages threw unexpectedly (non-fatal, keeping original bodyHtml):', err);
+        return result;
+    }
+
+    const { bodyHtml: newBodyHtml, stats } = embedResult;
+
+    // The clipboard's text/html flavour is `result.html`, not
+    // `result.bodyHtml` (spec §5) — it must carry the same embedded
+    // images, so rebuild it around the new bodyHtml too.
+    const newHtml = _spliceBodyHtml(result.html, oldBodyHtml, newBodyHtml);
+
+    return {
+        ...result,
+        bodyHtml: newBodyHtml,
+        html: newHtml,
+        meta: {
+            ...(result.meta || {}),
+            warnings: [...(result.meta?.warnings || []), ...stats.warnings],
+            imageStats: stats,
+        },
+    };
+}
+
+/**
+ * Replace the (single, verbatim) `oldBodyHtml` substring inside
+ * `fullHtml` with `newBodyHtml`. `fullHtml` is produced by
+ * core/html-document.js's `wrapAsDocument(bodyHtml, title)` — a fixed
+ * head/body shell around exactly one copy of `bodyHtml` — so locating
+ * that substring and splicing is equivalent to (and far cheaper than)
+ * re-running the wrap template.
+ *
+ * Deliberately uses indexOf + slice, not `String.replace` — `replace`'s
+ * string form treats `$&`/`$1`/`$$`/... specially in the REPLACEMENT
+ * text, and `newBodyHtml` is untrusted document content that could
+ * legitimately contain a literal `$1` (e.g. a price).
+ *
+ * @param {string} fullHtml
+ * @param {string} oldBodyHtml
+ * @param {string} newBodyHtml
+ * @returns {string}
+ */
+function _spliceBodyHtml(fullHtml, oldBodyHtml, newBodyHtml) {
+    if (typeof fullHtml !== 'string' || !oldBodyHtml) return fullHtml;
+    const idx = fullHtml.indexOf(oldBodyHtml);
+    if (idx === -1) {
+        console.warn(
+            '[ImageEmbedder] Could not locate bodyHtml inside the full wrapped document — ' +
+            'html left without embedded images (bodyHtml/clipboard text still has them).'
+        );
+        return fullHtml;
+    }
+    return fullHtml.slice(0, idx) + newBodyHtml + fullHtml.slice(idx + oldBodyHtml.length);
 }
