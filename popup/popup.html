@@ -93,6 +93,18 @@
       <span id="warnings-text" class="warnings-text"></span>
     </section>
 
+    <!-- Options — "Embed images" toggle (spec §4.4). Default ON: whether
+         Google Docs accepts data: URI images on paste is unverified
+         (spec §8), so this checkbox is the escape hatch. Persisted in
+         chrome.storage.local, read by background/service-worker.js
+         (ImageEmbedSettings) before every embed pass. -->
+    <section id="options-row" class="options-row">
+      <label class="option-toggle" for="chk-embed-images">
+        <input type="checkbox" id="chk-embed-images" checked />
+        <span>Embed images</span>
+      </label>
+    </section>
+
     <!-- Primary action -->
     <section id="actions-primary" class="actions">
       <button id="btn-extract" class="btn btn-primary" disabled>
@@ -154,6 +166,15 @@
       </button>
 
     </section>
+
+    <!-- .docx image caveat (spec §7) — the DOCX writer is deferred to v2.2
+         and currently ignores <img> entirely, so images embedded above only
+         reach the clipboard (Copy / New Doc) output, never the .docx
+         download. Stated up front rather than left for the user to
+         discover. -->
+    <p id="docx-image-note" class="docx-image-note hidden">
+      Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.
+    </p>
 
     <!-- Notification banner -->
     <div id="notification" class="notification hidden">

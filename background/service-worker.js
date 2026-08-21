@@ -47,6 +47,7 @@
 import { UrlTransformer } from '../lib/url-transformer.js';
 import { parseCsv, csvToHtml } from '../lib/csv-to-html.js';
 import { fetchDocHtml } from '../lib/transport.js';
+import { ImageEmbedder } from '../lib/image-embedder.js';
 
 
 // ─── PipelineState ──────────────────────────────────────────────────────────
@@ -221,6 +222,26 @@ class PolicyManager {
             await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: staleIds });
             console.log(`[PolicyManager] Swept ${staleIds.length} stale session rule(s):`, staleIds);
         }
+    }
+}
+
+// ─── ImageEmbedSettings ─────────────────────────────────────────────────────
+// The "Embed images" popup toggle (spec §4.4). Lives in chrome.storage.local
+// (not .session) so it persists like a normal setting, across browser
+// restarts, not just across one extraction. Default ON: whether Google Docs
+// actually accepts `data:` URI images on paste is unverified (spec §8 Q1),
+// so ON is the useful-by-default guess and the toggle is the escape hatch
+// if that guess turns out to be wrong for a given user/session.
+
+class ImageEmbedSettings {
+
+    static STORAGE_KEY = 'embedImagesEnabled';
+
+    /** @returns {Promise<boolean>} */
+    static async isEnabled() {
+        const stored = await chrome.storage.local.get(ImageEmbedSettings.STORAGE_KEY);
+        const value = stored[ImageEmbedSettings.STORAGE_KEY];
+        return value === undefined ? true : !!value;
     }
 }
 
@@ -580,10 +601,11 @@ class ExtensionController {
                 payload.rawHtml,
                 payload.docType || 'docs'
             );
-            return {
+            const result = {
                 ...parsed,
                 meta: { ...(parsed.meta || {}), transport: 'tabNav' },
             };
+            return await ExtensionController.embedImagesIntoResult(result, tabId);
         } catch (err) {
             console.error(
                 '[ExtensionController] Offscreen parse failed, falling back to in-page scan:',
@@ -610,6 +632,99 @@ class ExtensionController {
                 },
             };
         }
+    }
+
+    /**
+     * Embed the document's own `docs.google.com` images as `data:` URIs
+     * into `result.bodyHtml` (spec §4), honouring the popup's "Embed
+     * images" toggle (`ImageEmbedSettings`, default ON). Called after every
+     * offscreen parse that produces Docs `bodyHtml` — never for Sheets
+     * (csv-derived HTML has no `<img>` tags to begin with) and never when
+     * the offscreen parse itself failed (nothing to embed into).
+     *
+     * `ImageEmbedder.embedImages` never throws — every fetch failure
+     * degrades to "keep the original src, add a warning" (spec §4.2) — so
+     * the try/catch here is defense in depth only, not the real safety net.
+     *
+     * @param {object} result   The parse-result contract ({title, text, html, bodyHtml, charCount, meta}).
+     * @param {number|undefined} tabId  The document's own tab — needed for the T2 csFetch fallback.
+     * @returns {Promise<object>} A new result object; `result` is not mutated.
+     */
+    static async embedImagesIntoResult(result, tabId) {
+        if (!result || typeof result.bodyHtml !== 'string' || result.bodyHtml.length === 0) {
+            return result;
+        }
+
+        const enabled = await ImageEmbedSettings.isEnabled();
+        if (!enabled) {
+            console.log('[ExtensionController] Image embedding is OFF (popup toggle) — leaving image URLs as-is.');
+            return result;
+        }
+
+        const oldBodyHtml = result.bodyHtml;
+        let embedResult;
+        try {
+            embedResult = await ImageEmbedder.embedImages(oldBodyHtml, {
+                tabId,
+                budgetBytes: ImageEmbedder.TOTAL_BUDGET_BYTES,
+            });
+        } catch (err) {
+            // Defense in depth only — embedImages is designed to never throw.
+            console.error('[ExtensionController] embedImages threw unexpectedly (non-fatal, keeping original bodyHtml):', err);
+            return result;
+        }
+
+        const { bodyHtml: newBodyHtml, stats } = embedResult;
+
+        // The clipboard's text/html flavour is `result.html`, not
+        // `result.bodyHtml` (spec §5) — it must carry the same embedded
+        // images, so rebuild it around the new bodyHtml too.
+        const newHtml = ExtensionController._spliceBodyHtml(result.html, oldBodyHtml, newBodyHtml);
+
+        return {
+            ...result,
+            bodyHtml: newBodyHtml,
+            html: newHtml,
+            meta: {
+                ...(result.meta || {}),
+                warnings: [...(result.meta?.warnings || []), ...stats.warnings],
+                imageStats: stats,
+            },
+        };
+    }
+
+    /**
+     * Replace the (single, verbatim) `oldBodyHtml` substring inside
+     * `fullHtml` with `newBodyHtml`. `fullHtml` is produced by the
+     * offscreen parser's `wrapAsDocument(bodyHtml, title)` — a fixed head/
+     * body shell around exactly one copy of `bodyHtml` — so locating that
+     * substring and splicing is equivalent to (and far cheaper than)
+     * re-running the wrap template, which isn't reachable from here anyway
+     * (it's a private static method of `OffscreenParser`, spec §6 keeps
+     * `offscreen/parser.js` out of this file's scope).
+     *
+     * Deliberately uses indexOf + slice, not `String.replace` — `replace`'s
+     * string form treats `$&`/`$1`/`$$`/... specially in the REPLACEMENT
+     * text, and `newBodyHtml` is untrusted document content that could
+     * legitimately contain a literal `$1` (e.g. a price).
+     *
+     * @param {string} fullHtml
+     * @param {string} oldBodyHtml
+     * @param {string} newBodyHtml
+     * @returns {string}
+     * @private
+     */
+    static _spliceBodyHtml(fullHtml, oldBodyHtml, newBodyHtml) {
+        if (typeof fullHtml !== 'string' || !oldBodyHtml) return fullHtml;
+        const idx = fullHtml.indexOf(oldBodyHtml);
+        if (idx === -1) {
+            console.warn(
+                '[ExtensionController] Could not locate bodyHtml inside the full wrapped document — ' +
+                'html left without embedded images (bodyHtml/clipboard text still has them).'
+            );
+            return fullHtml;
+        }
+        return fullHtml.slice(0, idx) + newBodyHtml + fullHtml.slice(idx + oldBodyHtml.length);
     }
 
     /**
@@ -755,7 +870,7 @@ class ExtensionController {
 
             const parsed = await OffscreenManager.parse(html, 'docs');
 
-            const result = {
+            let result = {
                 ...parsed,
                 meta: {
                     ...(parsed.meta || {}),
@@ -764,6 +879,9 @@ class ExtensionController {
                     docId,
                 },
             };
+
+            await PipelineState.write({ phase: 'embedding-images' });
+            result = await ExtensionController.embedImagesIntoResult(result, tabId);
 
             await chrome.storage.session.set({
                 lastExtraction: result,

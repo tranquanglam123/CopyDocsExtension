@@ -212,6 +212,46 @@ body {
   transition: width 400ms ease;
 }
 
+/* ─── Options row (Embed images toggle) ─────────────────────────── */
+
+.options-row {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 2px;
+}
+
+.option-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option-toggle input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent-indigo);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.option-toggle:hover {
+  color: var(--text-primary);
+}
+
+/* ─── .docx image caveat ─────────────────────────────────────────── */
+
+.docx-image-note {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0 4px;
+}
+
 /* ─── Buttons ───────────────────────────────────────────────────── */
 
 .actions {

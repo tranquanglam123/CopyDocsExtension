@@ -37,6 +37,7 @@
 import { HtmlSanitize } from '../lib/html-sanitize.js';
 import { StyleDecision } from '../lib/style-decision.js';
 import { ContainerScore } from '../lib/container-score.js';
+import { StyleFill } from '../lib/style-fill.js';
 
 class OffscreenParser {
 
@@ -75,16 +76,12 @@ class OffscreenParser {
         'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE',
         'SUP', 'SUB',
         'UL', 'OL', 'LI',
-        'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'CAPTION',
+        'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'CAPTION',
+        'COLGROUP', 'COL',
         'A',
         'BLOCKQUOTE', 'PRE', 'CODE',
         'SPAN', 'DIV',
         'IMG',
-    ]);
-
-    /** Block-level tags where paragraph alignment / indent are worth keeping. */
-    static ALIGN_INDENT_TAGS = new Set([
-        'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'TH', 'BLOCKQUOTE',
     ]);
 
     /** Element tags scored as structural-fallback container candidates (spec §4.3 step 2). */
@@ -101,6 +98,23 @@ class OffscreenParser {
 
     /** Max time to wait for the sandboxed iframe to finish loading srcdoc. */
     static LOAD_TIMEOUT_MS = 10000;
+
+    /**
+     * Fixed width the sandbox iframe is set to before any `getComputedStyle`
+     * read (spec §3.2 last line). Geometry is never taken from computed
+     * style (see `StyleFill` — layout is authored-only), but this still
+     * keeps any computed value that *does* leak through sane rather than
+     * reflecting the iframe's default near-zero width.
+     */
+    static SANDBOX_WIDTH_PX = 1000;
+
+    /**
+     * Size budget for `bodyHtml` (spec §3.6). Inlining authored + computed
+     * styles onto ~3 400 elements grows the output; past this, the
+     * computed-fill pass is dropped (authored styles only kept) rather than
+     * silently truncating anything.
+     */
+    static STYLE_FILL_SIZE_BUDGET_BYTES = 4 * 1024 * 1024; // 4 MB
 
     // ─── Entry point ────────────────────────────────────────────────────
 
@@ -136,11 +150,11 @@ class OffscreenParser {
 
             const title = OffscreenParser._extractTitle(idoc, container);
             const text = OffscreenParser._extractPlainText(idoc, container);
-            const bodyHtml = OffscreenParser._extractBodyHtml(idoc, iwin, container);
+            const { html: bodyHtml, warnings: styleWarnings } = OffscreenParser._extractBodyHtml(idoc, iwin, container);
             const fullHtml = OffscreenParser.wrapAsDocument(bodyHtml, title);
             const charCount = text.length;
 
-            const warnings = [];
+            const warnings = [...styleWarnings];
             if (charCount === 0) warnings.push('empty_content');
             if (method === 'structural-score') warnings.push('container_fallback_used');
             if (method === 'body-fallback') warnings.push('container_not_found');
@@ -179,12 +193,18 @@ class OffscreenParser {
      * spec-required combination: it lets us read the loaded document's DOM
      * synchronously, while guaranteeing any <script> in the fetched HTML
      * (and any that survives sanitisation) can never execute.
+     *
+     * Width is fixed at `SANDBOX_WIDTH_PX` (spec §3.2) rather than left at
+     * `0` — layout properties are never read from computed style (they are
+     * authored-only, see `StyleFill`), but a sane width keeps any computed
+     * value that does leak through from reflecting the iframe's near-zero
+     * default box.
      * @returns {HTMLIFrameElement}
      */
     static _createSandbox() {
         const iframe = document.createElement('iframe');
         iframe.setAttribute('sandbox', 'allow-same-origin');
-        iframe.style.cssText = 'position:absolute; width:0; height:0; border:0; visibility:hidden;';
+        iframe.style.cssText = `position:absolute; width:${OffscreenParser.SANDBOX_WIDTH_PX}px; height:0; border:0; visibility:hidden;`;
         return iframe;
     }
 
@@ -362,19 +382,37 @@ class OffscreenParser {
         return text.trim();
     }
 
-    // ─── Cleaned HTML extraction (fixes D2) ─────────────────────────────
+    // ─── Cleaned HTML extraction (fixes D2, F1, F2; style engine is F3/spec §3) ──
 
     /**
      * Produce clean inner HTML for `container`, resolving bold/italic/
-     * underline/alignment/indent from `getComputedStyle` BEFORE stripping
-     * class/id (spec §4.2). Runs in two passes over the same element list:
+     * underline (spec §4.2) and the full style-fidelity engine (spec v2.1
+     * §3) from `getComputedStyle` BEFORE stripping class/id. Runs in three
+     * passes over the same element list:
      *
      *   Pass 1 (read-only)  — capture every element's formatting decision
-     *                         while the original class-driven cascade is
-     *                         still fully intact.
-     *   Pass 2 (mutate)     — apply those precomputed decisions: wrap
-     *                         formatted <span>s as <b>/<i>/<u>, strip
-     *                         class/id/style, unwrap disallowed tags.
+     *                         (bold/italic/underline flags, the AUTHORED
+     *                         `style` attribute text, and its own + its
+     *                         parent's resolved `StyleFill.APPEARANCE_PROPERTIES`
+     *                         values) while the original class-driven
+     *                         cascade is still fully intact.
+     *   Pass 2 (mutate)     — apply the structural half of those decisions:
+     *                         wrap formatted <span>s as nested <b>/<i>/<u>
+     *                         (F1 — carrying the merged style onto the
+     *                         outermost new tag, spec §3.4), strip
+     *                         class/id/role/dir, unwrap disallowed tags.
+     *                         The `style` attribute itself is NOT written
+     *                         here — see Pass 3.
+     *   Pass 3 (style)      — `StyleFill.buildElementStyle` (pure, DOM-free)
+     *                         turns each surviving element's captured
+     *                         authored/computed values into its final
+     *                         `style` attribute. Runs once with the
+     *                         computed-fill included; if the resulting
+     *                         `bodyHtml` exceeds the size budget (spec
+     *                         §3.6), it re-runs authored-only and a
+     *                         `style_fill_skipped_size` warning is added —
+     *                         cheap to redo because it only touches
+     *                         attributes, not structure.
      *
      * Splitting read from mutate matters: mutating element N (e.g.
      * stripping its class) before element N+1's style is read would be
@@ -386,47 +424,80 @@ class OffscreenParser {
      * Element identity is preserved throughout (children are MOVED via
      * `appendChild`, never round-tripped through `innerHTML` reparsing) so
      * a node nested two levels inside a reformatted <span> still gets its
-     * own class/style cleanup applied.
+     * own class/style cleanup applied. Where an element IS replaced (the
+     * span → b/i/u conversion, and the div → p normalisation below), its
+     * Pass-1 decision is carried forward to the replacement in
+     * `styleTargets` so Pass 3 still finds it.
      *
      * @param {Document} idoc
      * @param {Window} iwin
      * @param {Element} container
-     * @returns {string}
+     * @returns {{html: string, warnings: string[]}}
      */
     static _extractBodyHtml(idoc, iwin, container) {
         const allEls = [...container.querySelectorAll('*')];
 
-        // ── Pass 1: read computed style decisions ──────────────────────
+        // ── Pass 1: read authored + computed style decisions ───────────
+        // `appearanceCache` avoids re-reading the same element's computed
+        // style twice — most elements are visited once as "self" and again
+        // as some sibling's "parent".
+        const appearanceCache = new Map();
+        const computeAppearance = (el, cs) => {
+            const styleDecl = cs || iwin.getComputedStyle(el);
+            const obj = {};
+            for (const prop of StyleFill.APPEARANCE_PROPERTIES) {
+                obj[prop] = styleDecl.getPropertyValue(prop);
+            }
+            return obj;
+        };
+        const getAppearance = (el) => {
+            if (!appearanceCache.has(el)) {
+                appearanceCache.set(el, computeAppearance(el));
+            }
+            return appearanceCache.get(el);
+        };
+
         const decisions = new Map();
         for (const el of allEls) {
             const cs = iwin.getComputedStyle(el);
-            const tag = StyleDecision.styleToTag({
+            const flags = StyleDecision.styleFlags({
                 fontWeight: cs.fontWeight,
                 fontStyle: cs.fontStyle,
                 textDecorationLine: cs.textDecorationLine || cs.textDecoration,
             });
+            // F1: a span may be more than one of bold/italic/underline at
+            // once — nest rather than collapsing to a single tag.
+            const formatTags = [];
+            if (flags.bold) formatTags.push('b');
+            if (flags.italic) formatTags.push('i');
+            if (flags.underline) formatTags.push('u');
 
-            let textAlign = null;
-            let marginLeft = null;
-            if (OffscreenParser.ALIGN_INDENT_TAGS.has(el.tagName)) {
-                const align = cs.textAlign;
-                if (align && !['start', 'left', 'normal', ''].includes(align)) {
-                    textAlign = align;
-                }
-                const margin = parseFloat(cs.marginLeft);
-                if (margin && margin > 0) {
-                    marginLeft = cs.marginLeft;
-                }
-            }
+            const ownAppearance = computeAppearance(el, cs);
+            appearanceCache.set(el, ownAppearance);
+            const parentAppearance = getAppearance(el.parentElement || container);
 
-            decisions.set(el, { tag, textAlign, marginLeft });
+            decisions.set(el, {
+                formatTags,
+                // Captured BEFORE Pass 2 removes it — this IS the authored
+                // style (spec §3.1/§3.2), read the same way regardless of
+                // whether it came from inline style="" or (for computed
+                // properties below) a <style> class.
+                authoredStyleText: el.getAttribute('style') || '',
+                ownAppearance,
+                parentAppearance,
+            });
         }
 
         // Now that every decision is captured, remove the <style>/<script>/
         // <noscript> elements that drove the cascade — safe from here on.
         container.querySelectorAll('style, script, noscript').forEach((el) => el.remove());
 
-        // ── Pass 2: mutate using the precomputed decisions only ────────
+        // ── Pass 2: mutate structure using the precomputed decisions ───
+        // `styleTargets` maps each SURVIVING element (which may be a
+        // replacement, not the original) to the Pass-1 decision Pass 3
+        // will turn into its `style` attribute.
+        const styleTargets = new Map();
+
         for (const el of allEls) {
             if (!el.isConnected) continue; // already excised (e.g. empty wrapper, or ancestor removed)
 
@@ -436,14 +507,26 @@ class OffscreenParser {
                 continue;
             }
 
-            const decision = decisions.get(el) || { tag: null, textAlign: null, marginLeft: null };
+            const decision = decisions.get(el) || { formatTags: [], authoredStyleText: '', ownAppearance: {}, parentAppearance: {} };
 
-            // Convert a formatted <span> into <b>/<i>/<u>, moving (not
-            // reparsing) its children so their own identity/decisions survive.
-            if (el.tagName === 'SPAN' && decision.tag) {
-                const repl = idoc.createElement(decision.tag);
-                while (el.firstChild) repl.appendChild(el.firstChild);
-                el.replaceWith(repl);
+            // F1: convert a formatted <span> into nested <b>/<i>/<u>, moving
+            // (not reparsing) its children so their own identity/decisions
+            // survive, and copying the span's merged style onto the
+            // OUTERMOST new tag — nothing the span carried is lost, even
+            // properties that duplicate what the tag itself now conveys
+            // (e.g. font-weight:700 alongside <b>).
+            if (el.tagName === 'SPAN' && decision.formatTags.length > 0) {
+                let outermost = null;
+                let innermost = null;
+                for (const tag of decision.formatTags) {
+                    const node = idoc.createElement(tag);
+                    if (innermost) innermost.appendChild(node);
+                    innermost = node;
+                    if (!outermost) outermost = node;
+                }
+                while (el.firstChild) innermost.appendChild(el.firstChild);
+                el.replaceWith(outermost);
+                styleTargets.set(outermost, decision);
                 continue;
             }
 
@@ -453,35 +536,69 @@ class OffscreenParser {
             el.removeAttribute('data-aria-posinset');
             el.removeAttribute('role');
             el.removeAttribute('dir');
-            el.removeAttribute('style'); // drop inline style; only re-add what we explicitly kept below
-
-            const kept = [];
-            if (decision.textAlign) kept.push(`text-align:${decision.textAlign}`);
-            if (decision.marginLeft) kept.push(`margin-left:${decision.marginLeft}`);
-            if (kept.length > 0) el.setAttribute('style', kept.join(';'));
+            // `style` is intentionally left untouched here — Pass 3 sets or
+            // removes it from the precomputed decision, and may run twice
+            // (spec §3.6 size budget), so nothing is written to it now.
 
             if (!OffscreenParser.ALLOWED_TAGS.has(el.tagName)) {
                 const frag = idoc.createDocumentFragment();
                 while (el.firstChild) frag.appendChild(el.firstChild);
                 el.replaceWith(frag);
+                continue; // unwrapped — no longer in the tree, nothing to style
             }
+
+            styleTargets.set(el, decision);
         }
 
         // Normalise bare DIVs that only wrap inline content into <p> —
-        // mobilebasic uses <div> for paragraphs.
+        // mobilebasic uses <div> for paragraphs. Carry the div's style
+        // target forward to the replacement <p> so Pass 3 still finds it.
         container.querySelectorAll('div').forEach((div) => {
             const hasBlockChild = [...div.children].some((c) =>
                 ['DIV', 'P', 'TABLE', 'UL', 'OL', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(c.tagName)
             );
             if (!hasBlockChild && div.textContent.trim()) {
                 const p = idoc.createElement('p');
-                if (div.hasAttribute('style')) p.setAttribute('style', div.getAttribute('style'));
                 while (div.firstChild) p.appendChild(div.firstChild);
                 div.replaceWith(p);
+                if (styleTargets.has(div)) {
+                    styleTargets.set(p, styleTargets.get(div));
+                    styleTargets.delete(div);
+                }
             }
         });
 
-        return container.innerHTML || '';
+        // ── Pass 3: apply final styles (spec §3.6 size budget) ─────────
+        const applyStyles = (includeComputedFill) => {
+            for (const [element, decision] of styleTargets) {
+                const styleObj = StyleFill.buildElementStyle({
+                    authoredStyleText: decision.authoredStyleText,
+                    computed: includeComputedFill ? decision.ownAppearance : undefined,
+                    parentComputed: includeComputedFill ? decision.parentAppearance : undefined,
+                });
+                const styleText = StyleFill.serializeStyle(styleObj);
+                if (styleText) {
+                    element.setAttribute('style', styleText);
+                } else {
+                    element.removeAttribute('style');
+                }
+            }
+        };
+
+        applyStyles(true);
+        let html = container.innerHTML || '';
+        const warnings = [];
+
+        const sizeBytes = new TextEncoder().encode(html).length;
+        if (sizeBytes > OffscreenParser.STYLE_FILL_SIZE_BUDGET_BYTES) {
+            // Never silently truncate — drop the computed-fill pass (authored
+            // styles only) and say so, instead of cutting the HTML short.
+            applyStyles(false);
+            html = container.innerHTML || '';
+            warnings.push('style_fill_skipped_size');
+        }
+
+        return { html, warnings };
     }
 
     // ─── Output wrapper (reused verbatim from the legacy DOMScanner) ────

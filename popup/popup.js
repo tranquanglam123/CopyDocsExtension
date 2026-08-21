@@ -27,6 +27,7 @@ const btnCopy = document.getElementById('btn-copy');
 const btnNewDoc = document.getElementById('btn-new-doc');
 const btnDownloadDocx = document.getElementById('btn-download-docx');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
+const docxImageNote = document.getElementById('docx-image-note');
 
 const notification = document.getElementById('notification');
 const notificationText = document.getElementById('notification-text');
@@ -34,12 +35,19 @@ const notificationText = document.getElementById('notification-text');
 const warningsBanner = document.getElementById('warnings-banner');
 const warningsText = document.getElementById('warnings-text');
 
+const chkEmbedImages = document.getElementById('chk-embed-images');
+
 // ── State ────────────────────────────────────────────────────────
 
 let extractedData = null;
 let currentDocTitle = 'document';
 let currentDocType = null;
 let pollTimer = null;
+
+// ── Settings (chrome.storage.local — persist across restarts) ─────
+// Key mirrors ImageEmbedSettings.STORAGE_KEY in background/service-worker.js.
+
+const EMBED_IMAGES_STORAGE_KEY = 'embedImagesEnabled';
 
 // ── Warnings (meta.warnings from the extraction result) ───────────
 // Never silent: an unrecognized warning code still renders verbatim
@@ -50,7 +58,34 @@ const WARNING_MESSAGES = {
     low_confidence: 'Low-confidence extraction — the result may be incomplete.',
     multi_tab_partial: 'Multi-tab doc: only the first tab was extracted.',
     tabnav_fallback: 'Direct fetch failed, so the extension fell back to the legacy method — your tab may have briefly navigated to the mobile view.',
+    image_budget_exceeded: 'Some images were too large to embed within the size budget, so they were left as links to Google Docs instead — they will only work while your session can reach them.',
+    style_fill_skipped_size: 'The formatted result was too large, so some computed styling was skipped — inline formatting from the source still applied.',
 };
+
+// Warning codes that carry a dynamic `:<n>` count suffix (spec §4.3) —
+// matched by prefix so the count itself doesn't need a dictionary entry.
+const WARNING_PREFIX_MESSAGES = [
+    {
+        prefix: 'image_embed_failed:',
+        build: (n) => `${n} image${n === '1' ? '' : 's'} could not be fetched and were left as links to Google Docs instead of being embedded.`,
+    },
+    {
+        prefix: 'image_not_bitmap:',
+        build: (n) => `${n} image${n === '1' ? '' : 's'} could not be embedded because the source wasn't actually a picture (e.g. a viewer page, not a bitmap) — left as a link instead.`,
+    },
+];
+
+/**
+ * @param {string} code  A raw warning code from meta.warnings.
+ * @returns {string} A human-readable message — the code itself if unrecognized (never silent).
+ */
+function warningMessage(code) {
+    if (WARNING_MESSAGES[code]) return WARNING_MESSAGES[code];
+    for (const { prefix, build } of WARNING_PREFIX_MESSAGES) {
+        if (code.startsWith(prefix)) return build(code.slice(prefix.length));
+    }
+    return code;
+}
 
 function showWarnings(warnings) {
     if (!warnings || warnings.length === 0) {
@@ -58,8 +93,32 @@ function showWarnings(warnings) {
         warningsText.textContent = '';
         return;
     }
-    warningsText.textContent = warnings.map((w) => WARNING_MESSAGES[w] || w).join(' ');
+    warningsText.textContent = warnings.map(warningMessage).join(' ');
     warningsBanner.classList.remove('hidden');
+}
+
+// ── Embed-images toggle (spec §4.4) ────────────────────────────────
+// Default ON — whether Google Docs accepts data: URI images on paste is
+// unverified (spec §8), so this checkbox is the escape hatch, not the
+// expected common case.
+
+async function initEmbedImagesToggle() {
+    try {
+        const stored = await chrome.storage.local.get(EMBED_IMAGES_STORAGE_KEY);
+        const value = stored[EMBED_IMAGES_STORAGE_KEY];
+        chkEmbedImages.checked = value === undefined ? true : !!value;
+    } catch (err) {
+        console.warn('[Popup] Could not read embed-images setting, defaulting to ON:', err);
+        chkEmbedImages.checked = true;
+    }
+
+    chkEmbedImages.addEventListener('change', async () => {
+        try {
+            await chrome.storage.local.set({ [EMBED_IMAGES_STORAGE_KEY]: chkEmbedImages.checked });
+        } catch (err) {
+            console.error('[Popup] Failed to persist embed-images setting:', err);
+        }
+    });
 }
 
 // ── Step IDs ────────────────────────────────────────────────────
@@ -127,6 +186,7 @@ function showExtractionResult(data) {
     );
     showWarnings(data.meta?.warnings);
     actionsExport.classList.remove('hidden');
+    docxImageNote.classList.remove('hidden');
     btnExtract.disabled = true;
     showNotification(`"${data.title}" ready — copy, open in new doc, or download!`, 'success');
 }
@@ -236,6 +296,7 @@ async function handleExtract() {
     btnExtract.disabled = true;
     progressSection.classList.remove('hidden');
     actionsExport.classList.add('hidden');
+    docxImageNote.classList.add('hidden');
     notification.classList.add('hidden');
     warningsBanner.classList.add('hidden');
 
@@ -439,5 +500,6 @@ btnDownloadTxt.addEventListener('click', handleDownloadTxt);
 
 // ── Boot ─────────────────────────────────────────────────────────
 
+initEmbedImagesToggle();
 init();
 
