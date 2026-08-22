@@ -1,7 +1,7 @@
 # Manual checklist — offscreen parser (P2)
 
 Node has no CSS engine, so `node --test` can exercise the pure decision
-logic (`src/core/style-decision.js`, `src/core/container-score.js`) but **cannot**
+logic (`src/lib/emphasis.js`, `src/lib/score.js`) but **cannot**
 run a real cascade end-to-end. This checklist is the D2 regression test
 (spec §11: *"feed a saved mobilebasic HTML fixture with class-based
 font-weight:700 and assert `<b>` appears in bodyHtml"*) run against a real
@@ -18,7 +18,7 @@ plus Google-chrome noise (`#gb`, `.gb_xyz`, `.mobile-topbar`,
 ## Path A — parser only, no service-worker wiring required
 
 This works today, independent of whatever the background-service-worker /
-manifest wiring agent has landed, because it talks to `src/entry/offscreen.js`
+manifest wiring agent has landed, because it talks to `src/offscreen/main.js`
 directly instead of going through `chrome.offscreen.createDocument`.
 
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
@@ -26,7 +26,7 @@ directly instead of going through `chrome.offscreen.createDocument`.
 2. On the CopyDocExt card, click **Details** → turn on **Allow access to
    file URLs** (needed so the console can `fetch()` the local fixture file).
 3. Open a new tab at:
-   `chrome-extension://<EXTENSION_ID>/src/entry/offscreen.html`
+   `chrome-extension://<EXTENSION_ID>/src/offscreen/offscreen.html`
 4. Open DevTools (F12) on that tab → Console tab.
 5. Run (adjust the file path to wherever you checked this repo out):
 
@@ -58,7 +58,7 @@ directly instead of going through `chrome.offscreen.createDocument`.
    | `bodyHtml` contains a `<table>` with a header row (`Quarter`/`Spend`) and two data rows | present |
    | `bodyHtml` does **not** contain `Sign out`, `gb_`, `mobile-topbar`, or `docs-butterbar` text | noise stripped |
    | `bodyHtml` does **not** contain any `class=` or `id=` attribute | stripped after style resolution |
-   | `bodyHtml` does **not** contain `<script`, `onload=`, `onerror=`, or `javascript:` | sanitisation (`src/core/html-sanitize.js`) |
+   | `bodyHtml` does **not** contain `<script`, `onload=`, `onerror=`, or `javascript:` | sanitisation (`src/lib/sanitize.js`) |
 
 7. Paste the returned `response.data.html` (the full wrapped document, not
    `bodyHtml`) into a scratch `.html` file and open it in a browser, or feed
@@ -72,7 +72,7 @@ directly instead of going through `chrome.offscreen.createDocument`.
 
 ## Path B — full pipeline (wiring has landed)
 
-`OffscreenManager` in `src/entry/background.js` now creates the offscreen
+`OffscreenManager` in `src/background/main.js` now creates the offscreen
 document and the `"offscreen"` permission is in `manifest.json`. The content
 script sends `{ action:'contentReady', data:{ rawHtml, title, url, docType } }`
 and the service worker routes `rawHtml` through the offscreen parser, falling
@@ -130,7 +130,7 @@ supported yet and must not start a pipeline.
 
 ## Path D — image embedding (spec §4, v2.1)
 
-`src/extraction/image-embedder.js` and the binary-fetch tiers in `src/extraction/http-transport.js`
+`src/background/extract/image.js` and the binary-fetch tiers in `src/background/extract/http.js`
 (`swFetchBinary`/`csFetchBinary`/`fetchBinary`) have full pure-logic coverage
 under `node --test` (`test/image-embedder.test.js`: URL collection, the
 content-type guard, both budgets, failed fetches — all against an injected
@@ -215,7 +215,7 @@ the red title block can ever survive at all, embedded or not.
 
 ### D3 — Which transport tier serves images: `swFetch` or `csFetch`? (spec §8 Q3)
 
-`src/extraction/http-transport.js` `fetchBinary` logs every attempt — this is answerable
+`src/background/extract/http.js` `fetchBinary` logs every attempt — this is answerable
 directly from the service worker console, no experimentation needed.
 
 1. Clear the service worker console.
@@ -237,14 +237,14 @@ directly from the service worker console, no experimentation needed.
 6. Record which tier won for this user's Chrome profile — if it's always T2
    `csFetchBinary`, that's a signal third-party cookies are blocked for this
    user (consistent with why T2 exists for the document-HTML fetch too, see
-   `src/extraction/http-transport.js`'s file header) and is useful context for future work,
+   `src/background/extract/http.js`'s file header) and is useful context for future work,
    not just for this checklist.
 
 ---
 
 ## What is NOT covered by this checklist
 
-- The structural container-detection **fallback** (`src/core/container-score.js`
+- The structural container-detection **fallback** (`src/lib/score.js`
   scoring path) only activates when none of `OffscreenParser.CONTAINER_SELECTORS`
   match — the bundled fixture's `div.doc-content#contents` hits the fast
   path. To exercise the fallback manually, strip the fixture's
@@ -252,9 +252,9 @@ directly from the service worker console, no experimentation needed.
   parser should still find the content via scoring and
   `response.data.meta.warnings` should include `"container_fallback_used"`.
 - Multi-tab Docs, multi-sheet Sheets, Slides, the quality gate, and the
-  ranker are **P3 scope** (`src/extraction/strategy-registry.js`, `src/extraction/quality-gate.js`,
-  `src/extraction/ranker.js` — not yet built) and are not exercised here. The transport
-  tiers (`src/extraction/http-transport.js`) ARE built as of v2.1 (both the document-HTML
+  ranker are **P3 scope** (`src/background/extract/registry.js`, `src/background/extract/quality-gate.js`,
+  `src/background/extract/ranker.js` — not yet built) and are not exercised here. The transport
+  tiers (`src/background/extract/http.js`) ARE built as of v2.1 (both the document-HTML
   tiers exercised by Path A/B and the image-binary tiers exercised by Path D)
   — only `detectWall` has automated coverage (`test/transport.test.js`); the
   fetch tiers themselves are Chrome-API-dependent and are exercised by Path D

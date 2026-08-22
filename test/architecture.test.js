@@ -1,14 +1,7 @@
 /**
- * Architecture tests (spec v3 §8).
- *
- * A layered structure that is only written down in a document rots — the next
- * person in a hurry puts a `chrome.storage` call in a pure module and nothing
- * complains. These tests are the enforcement, so the layering fails loudly
- * instead of quietly.
- *
- * They read the source as text rather than importing it: most of these modules
- * cannot be imported under Node at all (they reference `chrome`), and the point
- * is to check *where code lives*, not what it computes.
+ * Layering written only in a document rots. These tests are the enforcement.
+ * They read source as text: most modules reference `chrome` and cannot be
+ * imported under Node.
  */
 
 import { test, describe } from 'node:test';
@@ -22,11 +15,7 @@ const SRC = join(ROOT, 'src');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/**
- * Every .js file under a directory, as repo-relative POSIX paths.
- * @param {string} dir
- * @returns {string[]}
- */
+/** Every .js file under a directory, as repo-relative POSIX paths. */
 function jsFiles(dir) {
     const out = [];
     const walk = (d) => {
@@ -41,66 +30,53 @@ function jsFiles(dir) {
 }
 
 /**
- * Source with comments and string literals blanked out.
- *
- * Without this, `zip.addFile('word/document.xml', …)` in the DOCX writer reads
- * as a `document.` usage, and every JSDoc line that *describes* a chrome API
- * reads as a call. Both are false positives that would make the rules useless.
- *
- * @param {string} src
- * @returns {string}
+ * Source with comments and string literals blanked out. Without this,
+ * `zip.addFile('word/document.xml')` reads as a `document.` usage.
  */
 function code(src) {
     return src
-        .replace(/\/\*[\s\S]*?\*\//g, ' ')      // block comments
-        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')  // line comments (not `://`)
-        .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")  // single-quoted strings
-        .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')  // double-quoted strings
-        .replace(/`(?:[^`\\]|\\.)*`/g, '``');   // template literals
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+        .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+        .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+        .replace(/`(?:[^`\\]|\\.)*`/g, '``');
 }
 
-/**
- * Source with comments removed but string literals intact.
- *
- * `code()` blanks strings, which is the opposite of what the "shared values are
- * literals only in constants.js" rule needs — that rule is *looking for*
- * strings. But it must still ignore a warning code merely named in a JSDoc
- * line, so comments have to go and quotes have to stay.
- *
- * @param {string} src
- * @returns {string}
- */
+/** Comments removed, strings kept — for rules that look for string literals. */
 function stripComments(src) {
     return src
         .replace(/\/\*[\s\S]*?\*\//g, ' ')
         .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
 }
 
-/** @param {string} rel @returns {string} */
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
-const CORE = jsFiles(join(SRC, 'core'));
-const EXTRACTION = jsFiles(join(SRC, 'extraction'));
-const SHARED = jsFiles(join(SRC, 'shared'));
+const importsOf = (rel) =>
+    [...read(rel).matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gm)].map((m) => m[1]);
+
+const LIB = jsFiles(join(SRC, 'lib'));
+const EXTRACT = jsFiles(join(SRC, 'background', 'extract'));
+const BRIDGE = jsFiles(join(SRC, 'bridge'));
 const ALL_SRC = jsFiles(SRC);
+const REALMS = /(popup|background|offscreen|content)\//;
 
 // ─── Layer purity ───────────────────────────────────────────────────────────
 
 describe('layer purity', () => {
 
-    test('core/ never touches chrome.* — it is the layer node --test can exercise', () => {
-        for (const file of CORE) {
+    test('lib/ never touches chrome.* — it is the layer node --test can exercise', () => {
+        for (const file of LIB) {
             assert.ok(
                 !/\bchrome\s*\./.test(code(read(file))),
-                `${file} calls chrome.* — move that behind src/platform/`
+                `${file} calls chrome.* — move that behind src/bridge/`
             );
         }
     });
 
-    test('core/ never touches DOM globals', () => {
-        // `Blob` is excluded on purpose: it is a standard global in both the
-        // browser and Node 18+, and the DOCX writer legitimately produces one.
-        for (const file of CORE) {
+    test('lib/ never touches DOM globals', () => {
+        // `Blob` is excluded: a standard global in browser and Node 18+, and
+        // the DOCX writer legitimately produces one.
+        for (const file of LIB) {
             const src = code(read(file));
             assert.ok(!/\bDOMParser\b/.test(src), `${file} uses DOMParser`);
             assert.ok(!/\bwindow\s*\./.test(src), `${file} uses window.`);
@@ -111,29 +87,12 @@ describe('layer purity', () => {
         }
     });
 
-    test('extraction/ goes through platform/ instead of calling chrome.* directly', () => {
-        for (const file of EXTRACTION) {
+    test('background/extract/ goes through bridge/ instead of calling chrome.* directly', () => {
+        for (const file of EXTRACT) {
             assert.ok(
                 !/\bchrome\s*\./.test(code(read(file))),
-                `${file} calls chrome.* — use a src/platform/ wrapper`
+                `${file} calls chrome.* — use a src/bridge/ wrapper`
             );
-        }
-    });
-
-    test('shared/ is the bottom of the graph: no chrome.*, no imports from other layers', () => {
-        // An earlier version of this rule banned *every* import in shared/,
-        // which is stricter than the intent. shared/ being "the bottom" means
-        // nothing above it may be pulled in — not that i18n.js is forbidden
-        // from loading its own locale dictionaries. The blunt version pushed
-        // a real workaround into the source (a dynamic `import()` chosen to
-        // dodge this regex), which is the test shaping the code rather than
-        // guarding it.
-        const otherLayers = /(core|platform|extraction|services|entry|ui|popup|background|content|offscreen)\//;
-        for (const file of SHARED) {
-            assert.ok(!/\bchrome\s*\./.test(code(read(file))), `${file} calls chrome.*`);
-            for (const spec of [...read(file).matchAll(/import\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1])) {
-                assert.ok(!otherLayers.test(spec), `${file} imports ${spec} — shared/ sits below every layer`);
-            }
         }
     });
 });
@@ -142,28 +101,37 @@ describe('layer purity', () => {
 
 describe('dependency direction', () => {
 
-    /** @param {string} rel @returns {string[]} */
-    const importsOf = (rel) =>
-        [...read(rel).matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gm)].map((m) => m[1]);
-
-    test('core/ imports nothing but shared/', () => {
-        for (const file of CORE) {
+    test('lib/ imports nothing outside lib/', () => {
+        for (const file of LIB) {
             for (const spec of importsOf(file)) {
                 assert.ok(
-                    !/(platform|extraction|entry|ui)\//.test(spec),
-                    `${file} imports ${spec} — core/ may only depend on shared/`
+                    !REALMS.test(spec) && !spec.includes('bridge/'),
+                    `${file} imports ${spec} — lib/ sits below every layer`
                 );
             }
         }
     });
 
-    test('platform/ never depends on extraction/, ui/ or entry/', () => {
-        for (const file of jsFiles(join(SRC, 'platform'))) {
+    test('bridge/ never depends on a realm', () => {
+        for (const file of BRIDGE) {
             for (const spec of importsOf(file)) {
-                assert.ok(
-                    !/(extraction|ui|entry)\//.test(spec),
-                    `${file} imports ${spec} — platform/ sits below those layers`
-                );
+                assert.ok(!REALMS.test(spec), `${file} imports ${spec} — bridge/ sits below the realms`);
+            }
+        }
+    });
+
+    test('no realm imports another realm', () => {
+        for (const file of ALL_SRC) {
+            const own = file.split('/')[1];
+            if (!/^(popup|background|offscreen|content)$/.test(own)) continue;
+            for (const spec of importsOf(file)) {
+                for (const other of ['popup', 'background', 'offscreen', 'content']) {
+                    if (other === own) continue;
+                    assert.ok(
+                        !spec.includes(`${other}/`) || spec.includes(`bridge/chrome/${other}`),
+                        `${file} imports ${spec} — realms only meet through messages`
+                    );
+                }
             }
         }
     });
@@ -171,7 +139,7 @@ describe('dependency direction', () => {
     test('nothing imports an entry point', () => {
         for (const file of ALL_SRC) {
             for (const spec of importsOf(file)) {
-                assert.ok(!spec.includes('entry/'), `${file} imports ${spec}`);
+                assert.ok(!/\/main\.js$/.test(spec), `${file} imports ${spec} — entries are leaves`);
             }
         }
     });
@@ -195,22 +163,22 @@ describe('no duplicated concepts', () => {
         );
         assert.deepEqual(
             definitions,
-            ['src/core/html-document.js'],
+            ['src/lib/html.js'],
             `expected one definition, found: ${definitions.join(', ') || 'none'}`
         );
     });
 
-    test('shared values are literals only in shared/constants.js', () => {
-        // Deliberately specific strings — a generic word like "pipeline" would
-        // match prose. src/entry/content.js is exempt: content scripts cannot
-        // be ES modules under MV3, so it cannot import constants at all.
+    test('shared values are literals only in lib/const.js', () => {
+        // Specific strings on purpose — a generic word like "pipeline" would
+        // match prose. content/main.js is exempt: content scripts cannot be
+        // ES modules under MV3, so it cannot import anything.
         const guarded = [
             'embedImagesEnabled', 'uiLanguage', 'ruleAlloc',
             'pipelineWatchdog',
             'single_sheet_only', 'image_not_bitmap', 'image_embed_failed',
             'style_fill_skipped_size', 'image_budget_exceeded', 'tabnav_fallback',
         ];
-        const exempt = new Set(['src/shared/constants.js', 'src/entry/content.js']);
+        const exempt = new Set(['src/lib/const.js', 'src/content/main.js']);
 
         for (const file of ALL_SRC) {
             if (exempt.has(file)) continue;
@@ -218,7 +186,7 @@ describe('no duplicated concepts', () => {
             for (const value of guarded) {
                 assert.ok(
                     !new RegExp(`['"\`]${value}['"\`]`).test(src),
-                    `${file} hardcodes "${value}" — import it from src/shared/constants.js`
+                    `${file} hardcodes "${value}" — import it from src/lib/const.js`
                 );
             }
         }
@@ -232,29 +200,28 @@ describe('entry points are wiring only', () => {
     /** Line count matching `wc -l` — a trailing newline is not a line. */
     const lines = (rel) => read(rel).trimEnd().split('\n').length;
 
-    test('background.js is under 120 lines', () => {
-        assert.ok(lines('src/entry/background.js') < 120,
-            `background.js is ${lines('src/entry/background.js')} lines`);
+    test('background/main.js is under 120 lines', () => {
+        assert.ok(lines('src/background/main.js') < 120,
+            `background/main.js is ${lines('src/background/main.js')} lines`);
     });
 
-    test('content.js is under 100 lines', () => {
-        assert.ok(lines('src/entry/content.js') < 100,
-            `content.js is ${lines('src/entry/content.js')} lines`);
+    test('content/main.js is under 100 lines', () => {
+        assert.ok(lines('src/content/main.js') < 100,
+            `content/main.js is ${lines('src/content/main.js')} lines`);
     });
 
-    test('popup.js is a bootstrap, not a controller', () => {
-        const src = code(read('src/entry/popup.js'));
-        assert.ok(!/getElementById|querySelector/.test(src),
-            'popup.js touches the DOM — that belongs in src/ui/popup-view.js');
+    test('popup/main.js is a bootstrap, not a controller', () => {
+        assert.ok(!/getElementById|querySelector/.test(code(read('src/popup/main.js'))),
+            'popup/main.js touches the DOM — that belongs in src/popup/view.js');
     });
 
-    test('popup-view.js renders and decides nothing', () => {
-        assert.ok(!/\bchrome\s*\./.test(code(read('src/ui/popup-view.js'))),
-            'popup-view.js calls chrome.* — that belongs in the controller');
+    test('popup/view.js renders and decides nothing', () => {
+        assert.ok(!/\bchrome\s*\./.test(code(read('src/popup/view.js'))),
+            'popup/view.js calls chrome.* — that belongs in the controller');
     });
 
-    test('popup-controller.js never touches the DOM directly', () => {
-        assert.ok(!/getElementById|querySelector/.test(code(read('src/ui/popup-controller.js'))),
-            'popup-controller.js queries the DOM — go through src/ui/popup-view.js');
+    test('popup/controller.js never touches the DOM directly', () => {
+        assert.ok(!/getElementById|querySelector/.test(code(read('src/popup/controller.js'))),
+            'popup/controller.js queries the DOM — go through src/popup/view.js');
     });
 });

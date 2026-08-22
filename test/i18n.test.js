@@ -12,10 +12,10 @@
 
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { I18n } from '../src/shared/i18n.js';
-import { dict as en } from '../src/shared/locales/en.js';
-import { dict as vi } from '../src/shared/locales/vi.js';
-import { WARNINGS, WARNING_PREFIXES } from '../src/shared/constants.js';
+import { I18n } from '../src/lib/i18n/index.js';
+import { dict as en } from '../src/lib/i18n/en.js';
+import { dict as vi } from '../src/lib/i18n/vi.js';
+import { WARNINGS, WARNING_PREFIXES } from '../src/lib/const.js';
 
 // ─── Dictionary shape ───────────────────────────────────────────────────────
 

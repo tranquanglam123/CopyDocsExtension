@@ -12,7 +12,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { ImageEmbedder } from '../src/extraction/image-embedder.js';
+import { ImageEmbedder } from '../src/background/extract/image.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 

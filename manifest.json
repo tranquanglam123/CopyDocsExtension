@@ -9,7 +9,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "src/entry/popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -18,7 +18,7 @@
     "default_title": "CopyDocExt - Extract Restricted Docs"
   },
   "background": {
-    "service_worker": "src/entry/background.js",
+    "service_worker": "src/background/main.js",
     "type": "module"
   },
   "permissions": [
@@ -41,7 +41,7 @@
         "*://docs.google.com/*/mobilebasic*"
       ],
       "js": [
-        "src/entry/content.js"
+        "src/content/main.js"
       ],
       "run_at": "document_idle"
     }

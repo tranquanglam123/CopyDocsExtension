@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CopyDocExt</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+
+<body>
+  <div class="popup-container">
+
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="logo-row">
+        <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="2" width="14" height="20" rx="2" stroke="url(#g1)" stroke-width="1.8" />
+          <path d="M7 7h6M7 10h6M7 13h4" stroke="url(#g1)" stroke-width="1.4" stroke-linecap="round" />
+          <path d="M16 10l4 4m0 0l-4 4m4-4H12" stroke="#6ee7b7" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <defs>
+            <linearGradient id="g1" x1="3" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#818cf8" />
+              <stop offset="1" stop-color="#6ee7b7" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <h1>CopyDocExt</h1>
+      </div>
+      <p class="subtitle" data-i18n="popup.subtitle">Extract restricted Google Docs</p>
+    </header>
+
+    <!-- Status Card -->
+    <section id="status-card" class="card status-card">
+      <div class="status-row">
+        <span id="status-icon" class="status-icon">⏳</span>
+        <div>
+          <p id="status-title" class="status-title" data-i18n="popup.status.checking">Checking…</p>
+          <p id="status-detail" class="status-detail"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Progress Section (hidden until extraction starts).
+         Two step sequences share this bar — popup.js shows/hides them via
+         setStepMode() so only one is visible at a time:
+           - fetch transport (Docs swFetch/csFetch, Sheets swFetch): the
+             tab is never touched, so it's Validate → Fetch → Parse → Done.
+           - tabNav (legacy, now a last-resort fallback only): the original
+             5-step Validate → Block JS → Navigate → Extract → Done. -->
+    <section id="progress-section" class="card progress-section hidden">
+      <div class="progress-steps">
+        <div class="step" id="step-validate" data-step="1">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.validate">Validate</span>
+        </div>
+        <div class="step" id="step-fetch" data-step="2">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.fetch">Fetch</span>
+        </div>
+        <div class="step" id="step-parse" data-step="3">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.parse">Parse</span>
+        </div>
+        <div class="step hidden" id="step-block" data-step="2">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.blockJs">Block JS</span>
+        </div>
+        <div class="step hidden" id="step-navigate" data-step="3">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.navigate">Navigate</span>
+        </div>
+        <div class="step hidden" id="step-extract" data-step="4">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.extract">Extract</span>
+        </div>
+        <div class="step" id="step-done" data-step="5">
+          <span class="step-dot"></span>
+          <span class="step-label" data-i18n="popup.step.done">Done</span>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+    </section>
+
+    <!-- Warnings banner — driven by extraction result meta.warnings.
+         Never hidden silently: any warning code the popup doesn't
+         recognize is still shown verbatim (see popup.js). -->
+    <section id="warnings-banner" class="card warnings-banner hidden">
+      <span class="warnings-icon">⚠️</span>
+      <span id="warnings-text" class="warnings-text"></span>
+    </section>
+
+    <!-- Options — "Embed images" toggle (spec §4.4). Default ON: whether
+         Google Docs accepts data: URI images on paste is unverified
+         (spec §8), so this checkbox is the escape hatch. Persisted in
+         chrome.storage.local, read by background/service-worker.js
+         (ImageEmbedSettings) before every embed pass. -->
+    <section id="options-row" class="options-row">
+      <label class="option-toggle" for="chk-embed-images">
+        <input type="checkbox" id="chk-embed-images" checked />
+        <span data-i18n="popup.options.embedImages">Embed images</span>
+      </label>
+    </section>
+
+    <!-- Primary action -->
+    <section id="actions-primary" class="actions">
+      <button id="btn-extract" class="btn btn-primary" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span data-i18n="popup.action.extract">Extract Content</span>
+      </button>
+    </section>
+
+    <!-- Post-extraction actions (hidden initially) -->
+    <section id="actions-export" class="actions-grid hidden">
+
+      <!-- Copy with formatting -->
+      <button id="btn-copy" class="btn btn-accent" data-i18n-title="popup.action.copyTitle"
+        title="Copy with formatting (paste into Google Docs / Word)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+        <span data-i18n="popup.action.copy">Copy</span>
+      </button>
+
+      <!-- Open in new Google Doc -->
+      <button id="btn-new-doc" class="btn btn-accent" data-i18n-title="popup.action.newDocTitle"
+        title="Copy & open a new Google Doc — press Ctrl+V to paste">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="12" y1="18" x2="12" y2="12" />
+          <line x1="9" y1="15" x2="15" y2="15" />
+        </svg>
+        <span data-i18n="popup.action.newDoc">New Doc</span>
+      </button>
+
+      <!-- Download .docx -->
+      <button id="btn-download-docx" class="btn btn-secondary" data-i18n-title="popup.action.docxTitle"
+        title="Download as Word document (.docx)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span data-i18n="popup.action.docx">.docx</span>
+      </button>
+
+      <!-- Download .txt -->
+      <button id="btn-download-txt" class="btn btn-secondary" data-i18n-title="popup.action.txtTitle"
+        title="Download as plain text (.txt)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span data-i18n="popup.action.txt">.txt</span>
+      </button>
+
+    </section>
+
+    <!-- .docx image caveat (spec §7) — the DOCX writer is deferred to v2.2
+         and currently ignores <img> entirely, so images embedded above only
+         reach the clipboard (Copy / New Doc) output, never the .docx
+         download. Stated up front rather than left for the user to
+         discover. -->
+    <p id="docx-image-note" class="docx-image-note hidden" data-i18n="popup.docxNote">
+      Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.
+    </p>
+
+    <!-- Notification banner -->
+    <div id="notification" class="notification hidden">
+      <span id="notification-text"></span>
+    </div>
+
+    <!-- Footer — language selector (spec v3 §5.5) next to the version.
+         Switching re-renders the popup immediately, see
+         ui/popup-controller.js's handleLanguageChange(). Native language
+         names in the options, not translated ones — the usual convention
+         for a language picker, so a user who picked the wrong language by
+         accident can still recognize their own. -->
+    <footer class="popup-footer">
+      <span>v2.0.0</span>
+      <select id="lang-select" class="lang-select" data-i18n-aria-label="popup.footer.languageLabel"
+        aria-label="Language">
+        <option value="en">English</option>
+        <option value="vi">Tiếng Việt</option>
+      </select>
+    </footer>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+
+</html>

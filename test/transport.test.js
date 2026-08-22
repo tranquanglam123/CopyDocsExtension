@@ -10,7 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectWall } from '../src/core/wall-detector.js';
+import { detectWall } from '../src/lib/wall.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 

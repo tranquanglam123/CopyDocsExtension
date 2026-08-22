@@ -9,7 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCsv, csvToHtml } from '../src/core/csv-to-html.js';
+import { parseCsv, csvToHtml } from '../src/lib/csv.js';
 
 test('parseCsv: quoted field containing a comma', () => {
     const rows = parseCsv('a,"b,c",d\n');
