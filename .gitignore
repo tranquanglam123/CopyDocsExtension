@@ -20,3 +20,6 @@ package-lock.json
 # Archives
 *.zip
 *.tar.gz
+
+# Specs stay local — not part of the shipped extension.
+docs/
