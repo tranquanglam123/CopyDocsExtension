@@ -1,11 +1,7 @@
-/**
- * background.js — service worker entry point (spec v3 §2/§4 P2). Wiring
- * and listener registration only; the pipelines and platform adapters live
- * under extraction/ and platform/ — see those files' headers for the
- * watchdog/rule-allocator/startup-sweep design notes.
- */
+/** Service worker entry: wiring and listener registration only. */
 import { UrlTransformer } from '../lib/url.js';
-import { registerMessageHandler } from '../bridge/chrome/runtime.js';
+import { onActionMessage, onStartupOrInstall } from '../bridge/chrome/runtime.js';
+import { MSG } from '../bridge/contract.js';
 import { getActiveTab, onTabRemoved, openNewDocTab } from '../bridge/chrome/tabs.js';
 import { downloadContent } from '../bridge/chrome/downloads.js';
 import { createWatchdogAlarm, onWatchdogAlarm } from '../bridge/chrome/alarms.js';
@@ -13,7 +9,9 @@ import { getExtractionState } from '../bridge/chrome/storage.js';
 import { runPipeline, runWatchdog, startupSweep, handleTabRemoved } from './extract/run.js';
 import { handleContentReady } from './extract/via-tabnav.js';
 
-const errorResponse = (err) => ({ success: false, error: err.message, code: typeof err.code === 'string' ? err.code : undefined, params: err.params }); // AppError's code/params (duck-typed) so the popup can translate; a plain Error still degrades to its raw message
+// AppError's code/params are duck-typed through so the popup can translate;
+// a plain Error degrades to its raw message.
+const errorResponse = (err) => ({ success: false, error: err.message, code: typeof err.code === 'string' ? err.code : undefined, params: err.params });
 /** @returns {Promise<object>} */
 async function checkTab() {
     const tab = await getActiveTab();
@@ -27,18 +25,17 @@ async function checkTab() {
     };
 }
 
-// Route incoming messages. The guard filtering out messages without a
-// string `action` (e.g. the offscreen document's `{type:'parse'}`) lives in
-// platform/messaging.js's `registerMessageHandler`.
+// registerMessageHandler drops anything without a string `action`, so the
+// offscreen document's `{type:'parse'}` never reaches this switch.
 async function handleMessage(message, sender, sendResponse) {
     try {
         switch (message.action) {
 
-            case 'checkTab':
+            case MSG.CHECK_TAB:
                 sendResponse({ success: true, data: await checkTab() });
                 break;
 
-            case 'startExtraction':
+            case MSG.START_EXTRACTION:
                 // The popup may close during navigation, so results always
                 // go to session storage regardless of this response.
                 try {
@@ -48,21 +45,21 @@ async function handleMessage(message, sender, sendResponse) {
                 }
                 break;
 
-            case 'contentReady':
+            case MSG.CONTENT_READY:
                 // tabNav path only — content script ships raw HTML for the
                 // offscreen parser (extraction/tabnav-pipeline.js).
                 await handleContentReady(message.data, sender?.tab?.id);
                 sendResponse({ success: true });
                 break;
 
-            case 'getExtractionStatus': {
+            case MSG.EXTRACTION_STATUS: {
                 // Popup polls this to recover after being closed & reopened.
                 const { lastExtraction, status, error } = await getExtractionState();
                 sendResponse({ success: true, data: lastExtraction, status, error });
                 break;
             }
 
-            case 'download':
+            case MSG.DOWNLOAD:
                 try {
                     const downloadId = await downloadContent(
                         message.text,
@@ -75,7 +72,7 @@ async function handleMessage(message, sender, sendResponse) {
                 }
                 break;
 
-            case 'openNewDoc':
+            case MSG.OPEN_NEW_DOC:
                 await openNewDocTab();
                 sendResponse({ success: true });
                 break;
@@ -91,7 +88,7 @@ async function handleMessage(message, sender, sendResponse) {
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
 
-registerMessageHandler(handleMessage);
+onActionMessage(handleMessage);
 
 // Clean up rules/pipeline state if a tab is closed mid-extraction.
 onTabRemoved((tabId) => {
@@ -106,14 +103,10 @@ onWatchdogAlarm(() => {
 });
 createWatchdogAlarm();
 
-// Startup / install sweep: the browser itself may have restarted
-// mid-extraction, in which case even the watchdog alarm never got a
-// chance to fire. Sweep unconditionally.
-chrome.runtime.onStartup.addListener(() => {
-    startupSweep('onStartup').catch((err) => console.error('[background] onStartup sweep failed:', err));
-});
-chrome.runtime.onInstalled.addListener(() => {
-    startupSweep('onInstalled').catch((err) => console.error('[background] onInstalled sweep failed:', err));
+// The browser may have restarted mid-extraction, in which case even the
+// watchdog alarm never got a chance to fire. Sweep unconditionally.
+onStartupOrInstall((reason) => {
+    startupSweep(reason).catch((err) => console.error(`[background] ${reason} sweep failed:`, err));
 });
 
 console.log('[background] Service worker initialized.');

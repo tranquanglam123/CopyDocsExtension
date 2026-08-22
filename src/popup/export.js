@@ -20,6 +20,8 @@
 
 import { DocxGenerator } from './docx.js';
 import { I18n } from '../lib/i18n/index.js';
+import { downloadDataUrl } from '../bridge/chrome/downloads.js';
+import { downloadText } from '../bridge/to-background.js';
 
 // ── Copy with formatting ─────────────────────────────────────────
 
@@ -77,20 +79,7 @@ function legacyCopy(text) {
  */
 export async function downloadDocx(bodyHtml, title, filename) {
     const blob = DocxGenerator.generate(bodyHtml, title);
-    const dataUrl = await blobToDataUrl(blob);
-
-    return new Promise((resolve, reject) => {
-        chrome.downloads.download(
-            { url: dataUrl, filename, saveAs: true },
-            (downloadId) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else {
-                    resolve(downloadId);
-                }
-            }
-        );
-    });
+    return downloadDataUrl(await blobToDataUrl(blob), filename);
 }
 
 // ── Download .txt ────────────────────────────────────────────────
@@ -104,12 +93,7 @@ export async function downloadDocx(bodyHtml, title, filename) {
  * @param {string} [mimeType='text/plain']
  */
 export async function downloadTxt(text, filename, mimeType = 'text/plain') {
-    const resp = await chrome.runtime.sendMessage({
-        action: 'download',
-        text,
-        filename,
-        mimeType,
-    });
+    const resp = await downloadText(text, filename, mimeType);
     if (!resp?.success) {
         throw new Error(resp?.error || I18n.t('error.downloadFailed'));
     }

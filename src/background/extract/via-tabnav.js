@@ -24,7 +24,7 @@ import { DOC_TYPES, TRANSPORTS } from '../../lib/const.js';
 import { AppError } from '../../lib/error.js';
 import { PolicyManager } from '../../bridge/chrome/netrules.js';
 import { waitForTabLoad, navigateTab } from '../../bridge/chrome/tabs.js';
-import { OffscreenManager } from '../../bridge/chrome/offscreen.js';
+import { parse } from '../../bridge/to-offscreen.js';
 import { setExtractionComplete } from '../../bridge/chrome/storage.js';
 import { PipelineState } from './state.js';
 import { embedImagesIntoResult } from './image.js';
@@ -134,7 +134,7 @@ export async function handleContentReady(payload, tabId) {
 
     let result;
     try {
-        const parsed = await OffscreenManager.parse(payload.rawHtml, payload.docType || DOC_TYPES.DOCS);
+        const parsed = await parse(payload.rawHtml, payload.docType || DOC_TYPES.DOCS);
         result = {
             ...parsed,
             meta: { ...(parsed.meta || {}), transport: TRANSPORTS.TAB_NAV },

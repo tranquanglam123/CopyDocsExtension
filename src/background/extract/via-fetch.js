@@ -13,7 +13,7 @@ import { DOC_TYPES } from '../../lib/const.js';
 import { fetchDocHtml } from './http.js';
 import { embedImagesIntoResult } from './image.js';
 import { PipelineState } from './state.js';
-import { OffscreenManager } from '../../bridge/chrome/offscreen.js';
+import { parse } from '../../bridge/to-offscreen.js';
 import { setExtractionComplete } from '../../bridge/chrome/storage.js';
 
 /**
@@ -37,7 +37,7 @@ export async function runFetchHtmlPipeline(tab, target, docId) {
 
         await PipelineState.write({ phase: 'parsing' });
 
-        const parsed = await OffscreenManager.parse(html, DOC_TYPES.DOCS);
+        const parsed = await parse(html, DOC_TYPES.DOCS);
 
         let result = {
             ...parsed,

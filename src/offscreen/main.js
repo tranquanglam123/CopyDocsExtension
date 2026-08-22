@@ -10,6 +10,7 @@
 import { HtmlSanitize } from '../lib/sanitize.js';
 import { wrapAsDocument } from '../lib/html.js';
 import { WARNINGS } from '../lib/const.js';
+import { onParseRequest } from '../bridge/chrome/runtime.js';
 import { createSandbox, loadSrcdoc } from './sandbox.js';
 import { findContainer, removeNoise } from './pass/container.js';
 import { extractTitle } from './pass/title.js';
@@ -79,17 +80,4 @@ async function parseHtml(html, docType) {
     }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message || message.type !== 'parse') return undefined; // not for us
-
-    (async () => {
-        try {
-            sendResponse({ ok: true, data: await parseHtml(message.html, message.docType) });
-        } catch (err) {
-            console.error('[offscreen] parse failed:', err);
-            sendResponse({ ok: false, error: err?.message || String(err) });
-        }
-    })();
-
-    return true; // keep the channel open for the async sendResponse
-});
+onParseRequest(parseHtml);

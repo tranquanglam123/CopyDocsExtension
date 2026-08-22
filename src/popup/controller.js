@@ -11,9 +11,13 @@
  * service worker, same recovery behaviour, same popup flow.
  */
 
-import { LOCAL_KEYS, EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES } from '../lib/const.js';
+import { EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES } from '../lib/const.js';
 import { I18n } from '../lib/i18n/index.js';
-import { getStoredLanguage, setStoredLanguage, detectLanguage } from '../bridge/prefs.js';
+import {
+    getStoredLanguage, setStoredLanguage, detectLanguage,
+    getEmbedImages, setEmbedImages,
+} from '../bridge/prefs.js';
+import * as background from '../bridge/to-background.js';
 import * as view from './view.js';
 import * as exportsApi from './export.js';
 
@@ -112,19 +116,12 @@ function rerenderCurrentView() {
 // expected common case.
 
 export async function initEmbedImagesToggle() {
-    try {
-        const stored = await chrome.storage.local.get(LOCAL_KEYS.EMBED_IMAGES);
-        const value = stored[LOCAL_KEYS.EMBED_IMAGES];
-        view.setEmbedImagesChecked(value === undefined ? true : !!value);
-    } catch (err) {
-        console.warn('[Popup] Could not read embed-images setting, defaulting to ON:', err);
-        view.setEmbedImagesChecked(true);
-    }
+    view.setEmbedImagesChecked(await getEmbedImages());
 }
 
 export async function handleEmbedImagesChange() {
     try {
-        await chrome.storage.local.set({ [LOCAL_KEYS.EMBED_IMAGES]: view.getEmbedImagesChecked() });
+        await setEmbedImages(view.getEmbedImagesChecked());
     } catch (err) {
         console.error('[Popup] Failed to persist embed-images setting:', err);
     }
@@ -135,7 +132,7 @@ export async function handleEmbedImagesChange() {
 export async function init() {
     try {
         // Check for completed or running extraction (popup recovery)
-        const statusResp = await chrome.runtime.sendMessage({ action: 'getExtractionStatus' });
+        const statusResp = await background.getExtractionStatus();
 
         if (statusResp?.status === EXTRACTION_STATUS.COMPLETE && statusResp.data) {
             presentResult(statusResp.data);
@@ -154,7 +151,7 @@ export async function init() {
         }
 
         // Normal init — check if current tab is a Google Doc
-        const response = await chrome.runtime.sendMessage({ action: 'checkTab' });
+        const response = await background.checkTab();
 
         if (response?.success && response.data.isValid) {
             currentDocTitle = response.data.title || 'document';
@@ -185,7 +182,7 @@ export function startPolling() {
     stopPolling();
     pollTimer = setInterval(async () => {
         try {
-            const resp = await chrome.runtime.sendMessage({ action: 'getExtractionStatus' });
+            const resp = await background.getExtractionStatus();
             if (resp?.status === EXTRACTION_STATUS.COMPLETE && resp.data) {
                 stopPolling();
                 presentResult(resp.data);
@@ -243,7 +240,7 @@ export async function handleExtract() {
 
         startPolling();
 
-        const response = await chrome.runtime.sendMessage({ action: 'startExtraction' });
+        const response = await background.startExtraction();
 
         stopPolling();
 
@@ -294,7 +291,7 @@ export async function handleNewDoc() {
 
     // Then open a new Google Doc
     try {
-        await chrome.runtime.sendMessage({ action: 'openNewDoc' });
+        await background.openNewDoc();
         view.showNotification(I18n.t('popup.notify.newDocOpened'), 'info');
     } catch (err) {
         view.showNotification(I18n.t('popup.notify.newDocFailed', { message: err.message }), 'error');
