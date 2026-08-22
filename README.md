@@ -63,15 +63,17 @@ Parsing, formatting, and file generation all happen locally — no telemetry, no
 
 ## Project structure
 
+One folder per Chrome realm, plus two shared layers. Import rules: [AGENTS.md](AGENTS.md).
+
 ```
 manifest.json
 src/
-  entry/       background, content script, popup, offscreen — wiring only
-  extraction/  fetch pipelines, transports, image embedding
-  platform/    the only layer that calls chrome.* APIs
-  core/        pure logic — URL parsing, sanitizing, CSV/zip helpers
-  ui/          popup view, controller, export handlers, docx generator
-  shared/      constants used across layers
+  popup/       the popup page: view, controller, exports, docx
+  background/  service worker; extract/ holds the three backends
+  offscreen/   the parser: sandbox host and one pass per file
+  content/     content script — readiness detection only
+  bridge/      the message contract, the facades, and all chrome.* calls
+  lib/         pure logic — URL, CSV, zip, styles, i18n, constants
 ```
 
 ## License

@@ -1,13 +1,7 @@
 /**
- * Docs extraction the legacy way: block JS on the tab, navigate to
- * /mobilebasic, let the content script scrape, restore JS.
- *
- * Last resort only. This is the path that redirects to the "clear cache and
- * cookies" page, because blocking scripts breaks Google's cookie bootstrap.
- * run.js reaches it only after every fetch tier has failed.
- *
- * There is no in-page fallback parser any more, so a failed offscreen parse
- * is fatal to this extraction.
+ * Block JS on the tab, navigate to /mobilebasic, let the content script
+ * scrape, restore JS. Last resort: blocking scripts breaks Google's cookie
+ * bootstrap, so this often lands on the "clear cache and cookies" page.
  */
 import { DOC_TYPES, TRANSPORTS } from '../../lib/const.js';
 import { AppError } from '../../lib/error.js';

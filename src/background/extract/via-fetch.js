@@ -1,13 +1,6 @@
 /**
- * Docs extraction via the fetch transport (
- * T1 `swFetch` then T2 `csFetch`). Moved from background/main.js's
- * `runFetchHtmlPipeline`.
- *
- * No DNR rule, no tab navigation — the user's tab is never touched.
- * If both fetch tiers fail, this throws and the caller
- * (run.js's `dispatchTransport`) falls back to
- * via-tabnav.js's `runTabNavPipeline`. See http.js's file
- * header for why this exists instead of tabNav-only.
+ * Docs extraction over http.js's two tiers. No DNR rule, no tab navigation.
+ * Both tiers failing throws, and run.js falls back to via-tabnav.js.
  */
 import { DOC_TYPES } from '../../lib/const.js';
 import { fetchDocHtml } from './http.js';

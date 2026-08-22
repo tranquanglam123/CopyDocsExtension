@@ -1,13 +1,7 @@
 /**
- * Dispatch, concurrency guard, watchdog, startup sweep, tab-removal cleanup.
- *
- * Three backends: via-fetch (Docs), via-csv (Sheets), via-tabnav (last
- * resort). tabnav is last because blocking scripts breaks Google's cookie
- * bootstrap, redirecting /mobilebasic to the "clear cache and cookies" page;
- * a plain fetch reaches it directly.
- *
- * The watchdog, the rule allocator and the startup sweep are what stop a tab
- * being left script-blocked when the service worker is killed mid-extraction.
+ * Dispatch to via-fetch, via-csv or via-tabnav, plus the concurrency guard.
+ * The watchdog and the startup sweep here are what stop a tab being left
+ * script-blocked when the service worker is killed mid-extraction.
  */
 import { TIMING, WARNINGS, DOC_TYPES, TRANSPORTS, SESSION_KEYS, EXTRACTION_STATUS } from '../../lib/const.js';
 import { UrlTransformer } from '../../lib/url.js';

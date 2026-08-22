@@ -63,15 +63,17 @@ cập mà trình duyệt của bạn vốn đã có. Parse, định dạng, và 
 
 ## Cấu trúc dự án
 
+Mỗi realm của Chrome một thư mục, cộng hai lớp dùng chung. Luật import: [AGENTS.md](AGENTS.md).
+
 ```
 manifest.json
 src/
-  entry/       background, content script, popup, offscreen — chỉ nối dây (wiring)
-  extraction/  fetch pipeline, transport, gắn ảnh (image embedding)
-  platform/    lớp duy nhất được gọi chrome.* API
-  core/        logic thuần — parse URL, sanitize, hỗ trợ CSV/zip
-  ui/          popup view, controller, xử lý export, tạo file docx
-  shared/      constants dùng chung giữa các lớp
+  popup/       trang popup: view, controller, export, docx
+  background/  service worker; extract/ chứa ba backend
+  offscreen/   bộ parse: host sandbox và mỗi pass một file
+  content/     content script — chỉ dò trang đã sẵn sàng
+  bridge/      contract message, các facade, và mọi lệnh gọi chrome.*
+  lib/         logic thuần — URL, CSV, zip, style, i18n, hằng số
 ```
 
 ## Giấy phép

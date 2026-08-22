@@ -63,11 +63,8 @@ export function setSelectedLanguage(lang) {
 }
 
 // ── Warnings ──────────────────────────────────────────────────────
-// Never silent: an unrecognized code renders verbatim. Codes come from
-// lib/const.js so a typo cannot desync the popup from the pipelines, and
-// each maps to a `warning.<code>` key rather than an English sentence.
-// `low_confidence` and `multi_tab_partial` stay literal — nothing emits them
-// yet, so they are not invented in const.js, but both have en/vi keys.
+// Never silent: an unrecognized code renders verbatim. `low_confidence` and
+// `multi_tab_partial` stay literal because nothing emits them yet.
 
 const WARNING_KEYS = {
     [WARNINGS.SINGLE_SHEET_ONLY]: 'warning.single_sheet_only',

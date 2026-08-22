@@ -1,13 +1,6 @@
 /**
- * The popup's exports: rich clipboard copy, .docx, .txt.
- *
- * The copy path writes one ClipboardItem carrying both `text/html` and
- * `text/plain`, with a ClipboardItem → writeText → execCommand fallback
- * chain. Writing plain text alone pastes into Google Docs unformatted.
- *
- * DOCX generation runs HERE (in the popup), not in the service worker,
- * because DocxGenerator needs DOM APIs (DOMParser, Node, etc.) that don't
- * exist in a service worker.
+ * The popup's exports: rich clipboard copy, .docx, .txt. All here rather
+ * than in the worker because DocxGenerator and the clipboard need a DOM.
  */
 
 import { DocxGenerator } from './docx.js';
@@ -18,10 +11,8 @@ import { downloadText } from '../bridge/to-background.js';
 // ── Copy with formatting ─────────────────────────────────────────
 
 /**
- * Write both `text/html` and `text/plain` into the same ClipboardItem —
- * this is what makes pasting into Google Docs / Word preserve formatting
- * instead of landing as plain text. Falls back progressively if the rich
- * write isn't available in this context.
+ * One ClipboardItem carrying both flavours — plain text alone pastes into
+ * Google Docs unformatted. Falls back if the rich write is unavailable.
  * @param {string} html
  * @param {string} text
  * @returns {Promise<'rich'|'plain'|'fallback'>} which path actually wrote the clipboard.
