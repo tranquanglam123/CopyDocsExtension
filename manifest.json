@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CopyDocExt",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Download & copy content from restricted Google Docs, Sheets, and Slides.",
   "icons": {
     "16": "icons/icon16.png",
@@ -9,7 +9,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "popup/popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -18,7 +18,7 @@
     "default_title": "CopyDocExt - Extract Restricted Docs"
   },
   "background": {
-    "service_worker": "background/service-worker.js",
+    "service_worker": "src/background/main.js",
     "type": "module"
   },
   "permissions": [
@@ -28,7 +28,9 @@
     "downloads",
     "declarativeNetRequest",
     "notifications",
-    "storage"
+    "storage",
+    "offscreen",
+    "alarms"
   ],
   "host_permissions": [
     "*://docs.google.com/*"
@@ -39,18 +41,9 @@
         "*://docs.google.com/*/mobilebasic*"
       ],
       "js": [
-        "content/content-script.js"
+        "src/content/main.js"
       ],
       "run_at": "document_idle"
     }
-  ],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "block_js",
-        "enabled": false,
-        "path": "rules/block-js-rule.json"
-      }
-    ]
-  }
+  ]
 }

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Unit 1: Local community - Google Docs</title>
+<style>
+  /*
+   * Shaped like the real /mobilebasic output measured in
+   * The measured restricted doc (784 196 bytes, 3 <style> blocks
+   * totalling 13 311 chars, 3 434 inline style="" attributes). This fixture
+   * is not that size, but every construct it exercises is real:
+   *   - character formatting as numbered classes (.c1 etc, D2)
+   *   - a class-driven cell background (no inline background-color at all,
+   *     so the ONLY way to recover it is getComputedStyle diffed against
+   *     the parent)
+   *   - a denied wrapper style (display:inline-block + position + max-width,
+   *     the rules) sitting next to a color that must survive the blocklist
+   *   - colgroup/col column widths (F2) and colspan/rowspan
+   */
+  body { font-family: arial, sans-serif; }
+  .c1 { font-weight: 700; }
+  .row-shade { background-color: #f4cccc; }
+  .noise-wrap { display: inline-block; position: absolute; max-width: 770px; color: #000000; }
+  .gb_x { display: none; }
+</style>
+</head>
+<body>
+
+  <!-- Google chrome noise — must be excluded from extraction. -->
+  <div id="gb" class="gb_xyz">
+    <a href="https://accounts.google.com/SignOutOptions" class="gb_x">Sign out</a>
+  </div>
+  <nav class="mobile-topbar">Google Docs</nav>
+
+  <div class="doc-content" id="contents">
+
+    <h1 id="title">Unit 1: Local community</h1>
+
+    <p>
+      A denied inline style sits right next to a colour that must survive
+      the blocklist:
+      <span class="noise-wrap">kept colour, dropped layout</span>
+    </p>
+
+    <p>
+      A bold, italic, coloured, non-default-font span — the F1 regression
+      (must keep <em>all three</em> of bold/italic/colour, not collapse to
+      a bare tag):
+      <span style="font-weight:700;font-style:italic;color:#ff0000;font-size:14pt;font-family:'Times New Roman'">Bold Italic Red</span>
+    </p>
+
+    <table class="waffle">
+      <colgroup>
+        <col span="1" style="width:30.6pt">
+        <col span="2" style="width:120pt">
+      </colgroup>
+      <thead>
+        <tr>
+          <!--
+            The real header cell from the rules, verbatim (the truncated
+            "…" in the spec's quoted fragment is filled in here with the
+            matching border-right/-bottom/-left longhands, same colour,
+            same width, same style — that is what the "…" elided, not an
+            invented shape).
+          -->
+          <th style="background-color:#c00000;border-top-width:1pt;border-top-style:solid;border-top-color:#ee822f;border-right-width:1pt;border-right-style:solid;border-right-color:#ee822f;border-bottom-width:1pt;border-bottom-style:solid;border-bottom-color:#ee822f;border-left-width:1pt;border-left-style:solid;border-left-color:#ee822f;width:30.6pt;padding:0pt 5.4pt 0pt 5.4pt;vertical-align:top">
+            <p style="text-align:center;font-size:10pt;font-family:&quot;Calibri&quot;;line-height:1.5">
+              <span style="font-weight:700;font-family:&quot;Times New Roman&quot;;font-size:10pt;color:#000000">No</span>
+            </p>
+          </th>
+          <th colspan="2" style="background-color:#c00000;border-top-width:1pt;border-top-style:solid;border-top-color:#ee822f;border-right-width:1pt;border-right-style:solid;border-right-color:#ee822f;border-bottom-width:1pt;border-bottom-style:solid;border-bottom-color:#ee822f;border-left-width:1pt;border-left-style:solid;border-left-color:#ee822f;padding:0pt 5.4pt 0pt 5.4pt;vertical-align:top">
+            <p style="text-align:center;font-size:10pt;font-family:&quot;Calibri&quot;;line-height:1.5">
+              <span style="font-weight:700;font-family:&quot;Times New Roman&quot;;font-size:10pt;color:#000000">Topic</span>
+            </p>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="width:30.6pt;padding:0pt 5.4pt 0pt 5.4pt;vertical-align:top">
+            <p style="text-align:center;font-size:10pt;font-family:&quot;Calibri&quot;">1</p>
+          </td>
+          <!--
+            No inline background-color at all — `.row-shade` is the ONLY
+            source of it. Recoverable only via getComputedStyle diffed
+            against the parent, never via node.style.
+          -->
+          <td colspan="2" rowspan="1" class="row-shade" style="padding:0pt 5.4pt 0pt 5.4pt;vertical-align:top">
+            <p style="font-size:10pt;font-family:&quot;Calibri&quot;">What is a community?</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="c1">A plain bold closing paragraph, class-driven (D2 regression, not inline).</p>
+
+  </div>
+
+  <footer class="docs-butterbar">This document is provided as-is.</footer>
+
+  <script>
+    // Must never execute — the offscreen parser loads this HTML into a
+    // sandboxed iframe with no `allow-scripts`.
+    document.title = 'SANDBOX ESCAPED';
+  </script>
+
+</body>
+</html>

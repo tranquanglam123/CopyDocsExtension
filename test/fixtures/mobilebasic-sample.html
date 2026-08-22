@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Quarterly Planning Notes - Google Docs</title>
+<style>
+  /*
+   * This is exactly the shape real /mobilebasic output takes: character
+   * formatting lives in numbered classes defined here, not in inline
+   * style="" attributes on the spans that use them. A parser that reads
+   * only node.style (the pre-fix content-script.js behaviour) sees none
+   * of this. A parser that resolves getComputedStyle() against a real
+   * cascade (the offscreen parser) sees all of it. This file is the D2
+   * regression fixture referenced by 
+   * §11 and by test/MANUAL-CHECKLIST.md.
+   */
+  body { font-family: arial, sans-serif; }
+  .c1 { font-weight: 700; }
+  .c2 { font-style: italic; }
+  .c3 { text-decoration: underline; }
+  .c4 { font-weight: 700; font-style: italic; }
+  .gb_x { display: none; }
+</style>
+</head>
+<body>
+
+  <!-- Google chrome noise that a real mobilebasic page carries — must be excluded from extraction. -->
+  <div id="gb" class="gb_xyz">
+    <a href="https://accounts.google.com/SignOutOptions" class="gb_x">Sign out</a>
+  </div>
+  <nav class="mobile-topbar">Google Docs</nav>
+
+  <div class="doc-content" id="contents">
+
+    <h1 id="title">Quarterly Planning Notes</h1>
+
+    <p>
+      This paragraph has <span class="c1">bold text</span>, some
+      <span class="c2">italic text</span>, and some
+      <span class="c3">underlined text</span> — all class-driven, exactly
+      like real mobilebasic output.
+    </p>
+
+    <p>
+      This span is <span class="c4">bold and italic at once</span>, to check
+      that a combined class still resolves to at least the bold tag.
+    </p>
+
+    <h2>Action Items</h2>
+    <ul>
+      <li>Ship the <span class="c1">offscreen parser</span></li>
+      <li>Verify the D2 regression fixture</li>
+      <li>Review with the team</li>
+    </ul>
+
+    <h2>Budget Snapshot</h2>
+    <table class="waffle">
+      <tbody>
+        <tr>
+          <th>Quarter</th>
+          <th>Spend</th>
+        </tr>
+        <tr>
+          <td>Q1</td>
+          <td>$12,000</td>
+        </tr>
+        <tr>
+          <td>Q2</td>
+          <td>$15,500</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>A plain, unformatted closing paragraph with no spans at all.</p>
+
+  </div>
+
+  <footer class="docs-butterbar">This document is provided as-is.</footer>
+
+  <script>
+    // Must never execute — the offscreen parser loads this HTML into a
+    // sandboxed iframe with no `allow-scripts`. If this ran, it would prove
+    // the sandbox failed.
+    document.title = 'SANDBOX ESCAPED';
+  </script>
+
+</body>
+</html>
