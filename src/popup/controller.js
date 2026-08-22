@@ -4,7 +4,8 @@
  * write goes through view.js and every message through bridge/.
  */
 
-import { EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES } from '../lib/const.js';
+import { EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES, VIEWS } from '../lib/const.js';
+import { decideInitialView } from '../lib/resume.js';
 import { I18n } from '../lib/i18n/index.js';
 import {
     getStoredLanguage, setStoredLanguage, detectLanguage,
@@ -26,7 +27,7 @@ let pollTimer = null;
  * without restarting polling or touching `extractedData`. 'idle' means the
  * static [data-i18n] labels are all that is showing.
  */
-let currentView = { kind: 'idle' };
+let currentView = { kind: VIEWS.IDLE };
 
 /** @param {string} kind @param {object} [payload] */
 function setView(kind, payload = {}) {
@@ -55,7 +56,7 @@ function errorText(err, fallbackKey) {
 function presentResult(data) {
     extractedData = data;
     view.setStepMode(stepModeForTransport(data.meta?.transport));
-    setView('result');
+    setView(VIEWS.RESULT);
     view.renderExtractionResult(data);
 }
 
@@ -81,14 +82,14 @@ export async function handleLanguageChange() {
 function rerenderCurrentView() {
     const { kind, payload } = currentView;
     switch (kind) {
-        case 'docDetected': view.renderDocDetected(payload.type, payload.url); break;
-        case 'notADoc': view.renderNotADoc(); break;
-        case 'slidesUnsupported': view.renderSlidesUnsupported(); break;
-        case 'initError': view.renderInitError(payload.message); break;
-        case 'recoveryRunning': view.renderRecoveryRunning(); break;
-        case 'result': view.renderExtractionResult(extractedData); break;
-        case 'failed': view.renderExtractionFailed(payload.message); break;
-        case 'extracting':
+        case VIEWS.DOC_DETECTED: view.renderDocDetected(payload.type, payload.url); break;
+        case VIEWS.NOT_A_DOC: view.renderNotADoc(); break;
+        case VIEWS.SLIDES_UNSUPPORTED: view.renderSlidesUnsupported(); break;
+        case VIEWS.INIT_ERROR: view.renderInitError(payload.message); break;
+        case VIEWS.RECOVERY_RUNNING: view.renderRecoveryRunning(); break;
+        case VIEWS.RESULT: view.renderExtractionResult(extractedData); break;
+        case VIEWS.FAILED: view.renderExtractionFailed(payload.message); break;
+        case VIEWS.EXTRACTING:
             view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t(payload.detailKey));
             break;
         default: break; // 'idle' — nothing dynamic to redraw
@@ -115,47 +116,66 @@ export async function handleEmbedImagesChange() {
 
 export async function init() {
     try {
-        // Check for completed or running extraction (popup recovery)
-        const statusResp = await background.getExtractionStatus();
+        // Both are read before deciding: a stored result belongs to one
+        // document, and showing it on any other hides that document.
+        const [statusResp, tabResp] = await Promise.all([
+            background.getExtractionStatus(),
+            background.checkTab(),
+        ]);
 
-        if (statusResp?.status === EXTRACTION_STATUS.COMPLETE && statusResp.data) {
-            presentResult(statusResp.data);
-            return;
-        }
+        const tab = tabResp?.success ? tabResp.data : null;
+        const decision = decideInitialView({
+            status: statusResp?.status,
+            storedResult: statusResp?.data || null,
+            tab,
+        });
 
-        if (statusResp?.status === EXTRACTION_STATUS.RUNNING) {
-            // The fetch tiers never navigate the tab, so a popup that had
-            // to poll back in means the tabnav fallback fired.
-            setView('recoveryRunning');
-            view.renderRecoveryRunning();
-            startPolling();
-            return;
-        }
+        currentDocTitle = decision.tab?.title || 'document';
+        currentDocType = decision.tab?.type || null;
 
-        // Normal init — check if current tab is a Google Doc
-        const response = await background.checkTab();
+        switch (decision.view) {
+            case VIEWS.RESULT:
+                presentResult(decision.result);
+                break;
 
-        if (response?.success && response.data.isValid) {
-            currentDocTitle = response.data.title || 'document';
-            currentDocType = response.data.type;
+            case VIEWS.RECOVERY_RUNNING:
+                setView(VIEWS.RECOVERY_RUNNING);
+                view.renderRecoveryRunning();
+                startPolling();
+                break;
 
-            if (response.data.type === DOC_TYPES.SLIDES) {
-                // Slides has no working extraction path — do not start a
-                // pipeline that can only fail.
-                setView('slidesUnsupported');
+            case VIEWS.SLIDES_UNSUPPORTED:
+                setView(VIEWS.SLIDES_UNSUPPORTED);
                 view.renderSlidesUnsupported();
-            } else {
-                setView('docDetected', { type: response.data.type, url: response.data.url });
-                view.renderDocDetected(response.data.type, response.data.url);
-            }
-        } else {
-            setView('notADoc');
-            view.renderNotADoc();
+                break;
+
+            case VIEWS.DOC_DETECTED:
+                setView(VIEWS.DOC_DETECTED, { type: decision.tab.type, url: decision.tab.url });
+                view.renderDocDetected(decision.tab.type, decision.tab.url);
+                break;
+
+            default:
+                setView(VIEWS.NOT_A_DOC);
+                view.renderNotADoc();
         }
     } catch (err) {
-        setView('initError', { message: err.message });
+        setView(VIEWS.INIT_ERROR, { message: err.message });
         view.renderInitError(err.message);
     }
+}
+
+/** Drop the finished result and re-run init against whatever tab is open. */
+export async function handleReset() {
+    stopPolling();
+    extractedData = null;
+    try {
+        await background.resetExtraction();
+    } catch (err) {
+        console.error('[Popup] Reset failed:', err);
+    }
+    view.clearResultUI();
+    setView(VIEWS.IDLE);
+    await init();
 }
 
 // ── Polling ──────────────────────────────────────────────────────
@@ -171,7 +191,7 @@ export function startPolling() {
             } else if (resp?.status === EXTRACTION_STATUS.ERROR) {
                 stopPolling();
                 const message = errorText(resp.error, 'error.checkStatusFallback');
-                setView('failed', { message });
+                setView(VIEWS.FAILED, { message });
                 view.renderExtractionFailed(message);
                 view.setExtractButtonDisabled(currentDocType === DOC_TYPES.SLIDES);
             }
@@ -201,18 +221,18 @@ export async function handleExtract() {
 
     try {
         view.setStep(0);
-        setView('extracting', { detailKey: 'popup.status.validating' });
+        setView(VIEWS.EXTRACTING, { detailKey: 'popup.status.validating' });
         view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t('popup.status.validating'));
         await delay(300);
 
         view.setStep(1);
         const fetchingKey = currentDocType === DOC_TYPES.SHEETS ? 'popup.status.fetchingSheet' : 'popup.status.fetchingDoc';
-        setView('extracting', { detailKey: fetchingKey });
+        setView(VIEWS.EXTRACTING, { detailKey: fetchingKey });
         view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t(fetchingKey));
         await delay(300);
 
         view.setStep(2);
-        setView('extracting', { detailKey: 'popup.status.parsing' });
+        setView(VIEWS.EXTRACTING, { detailKey: 'popup.status.parsing' });
         view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t('popup.status.parsing'));
 
         startPolling();
@@ -233,7 +253,7 @@ export async function handleExtract() {
     } catch (err) {
         stopPolling();
         console.error('[Popup]', err);
-        setView('failed', { message: err.message });
+        setView(VIEWS.FAILED, { message: err.message });
         view.renderExtractionFailed(err.message);
         view.showNotification(err.message, 'error');
         view.setExtractButtonDisabled(false);

@@ -78,7 +78,7 @@ export async function runTabNavPipeline(tab, target, docId) {
         };
 
         // handleContentReady already stored this; make sure.
-        await setExtractionComplete(extractedData);
+        await setExtractionComplete(extractedData, docId);
 
         return extractedData;
 
@@ -117,7 +117,9 @@ export async function handleContentReady(payload, tabId) {
         throw new AppError('error.offscreenParseFailed', { message: err.message });
     }
 
-    await setExtractionComplete(result);
+    // handleContentReady runs on a message, not inside runTabNavPipeline, so
+    // the docId comes from the state that pipeline persisted.
+    await setExtractionComplete(result, (await PipelineState.get())?.docId);
 
     // Release the pipeline if it is waiting.
     if (_pendingExtraction) {

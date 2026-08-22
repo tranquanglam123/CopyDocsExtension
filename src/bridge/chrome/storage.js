@@ -61,12 +61,26 @@ export async function setExtractionError(message) {
     });
 }
 
-/** @param {object} result */
-export async function setExtractionComplete(result) {
+/**
+ * `docId` is stamped into the result: a stored result outlives the tab it
+ * came from, and without it the popup cannot tell whose result it holds.
+ * @param {object} result
+ * @param {string} docId
+ */
+export async function setExtractionComplete(result, docId) {
     await chrome.storage.session.set({
-        [SESSION_KEYS.LAST_EXTRACTION]: result,
+        [SESSION_KEYS.LAST_EXTRACTION]: { ...result, meta: { ...(result.meta || {}), docId } },
         [SESSION_KEYS.EXTRACTION_STATUS]: EXTRACTION_STATUS.COMPLETE,
     });
+}
+
+/** Clear the finished result so the popup offers the current tab again. */
+export async function clearExtractionState() {
+    await chrome.storage.session.remove([
+        SESSION_KEYS.LAST_EXTRACTION,
+        SESSION_KEYS.EXTRACTION_STATUS,
+        SESSION_KEYS.LAST_EXTRACTION_ERROR,
+    ]);
 }
 
 // ─── Embed-images toggle ──────────────────────────────────────────────────

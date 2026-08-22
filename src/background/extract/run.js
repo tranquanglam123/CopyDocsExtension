@@ -111,7 +111,7 @@ export async function dispatchTransport(tab, target, docId) {
 
             // The fallback already stored `result`; overwrite it with the
             // warning-annotated version so a recovering popup sees it.
-            await setExtractionComplete(result);
+            await setExtractionComplete(result, docId);
 
             return result;
         }

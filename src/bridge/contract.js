@@ -8,11 +8,12 @@
  *
  * To the background — `{ action, ...payload }`, reply `{ success, ... }`:
  *
- *   CHECK_TAB           {}                        → { success, data: { isValid, type, typeLabel, url, title } }
+ *   CHECK_TAB           {}                        → { success, data: { isValid, type, typeLabel, url, title, docId } }
  *   START_EXTRACTION    {}                        → { success, data } | { success:false, error, code?, params? }
  *   EXTRACTION_STATUS   {}                        → { success, data, status, error }
  *   DOWNLOAD            { text, filename, mimeType } → { success, downloadId }
  *   OPEN_NEW_DOC        {}                        → { success }
+ *   RESET               {}                        → { success }
  *   CONTENT_READY       { data: { rawHtml, title, url, docType } } → { success }
  *
  * To the offscreen document — `{ type, ...payload }`:
@@ -28,6 +29,7 @@ export const MSG = Object.freeze({
     EXTRACTION_STATUS: 'getExtractionStatus',
     DOWNLOAD: 'download',
     OPEN_NEW_DOC: 'openNewDoc',
+    RESET: 'resetExtraction',
     CONTENT_READY: 'contentReady',
     PARSE: 'parse',
 });

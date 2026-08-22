@@ -37,6 +37,22 @@ export const EXTRACTION_STATUS = Object.freeze({
     ERROR: 'error',
 });
 
+// ─── Popup views ────────────────────────────────────────────────────────────
+// One name per thing the popup can be showing. lib/resume.js picks the one to
+// open with; the controller re-renders whichever is current on a language switch.
+
+export const VIEWS = Object.freeze({
+    IDLE: 'idle',
+    DOC_DETECTED: 'docDetected',
+    NOT_A_DOC: 'notADoc',
+    SLIDES_UNSUPPORTED: 'slidesUnsupported',
+    RECOVERY_RUNNING: 'recoveryRunning',
+    EXTRACTING: 'extracting',
+    RESULT: 'result',
+    FAILED: 'failed',
+    INIT_ERROR: 'initError',
+});
+
 // ─── Warning codes ──────────────────────────────────────────────────────────
 // Codes, never English sentences, so the popup can translate them.
 // `image_embed_failed` and `image_not_bitmap` carry a `:<count>` suffix.
