@@ -1,14 +1,7 @@
 /**
- * popup-controller.js — flow and messaging for the popup.
- *
- * Owns: init (including popup-recovery after being closed mid-extraction),
- * the tab check, starting an extraction, status polling, the embed-images
- * toggle's persistence, and the four export button handlers. Every
- * `chrome.*` call and every decision about what happens next lives here;
- * every DOM write is delegated to popup-view.js.
- *
- * Split out of entry/popup.js (spec v3 §4 P2) — same messages to the
- * service worker, same recovery behaviour, same popup flow.
+ * Popup flow: init and recovery, the tab check, extraction, polling, the
+ * embed toggle, the export handlers. Every decision lives here; every DOM
+ * write goes through view.js and every message through bridge/.
  */
 
 import { EXTRACTION_STATUS, TRANSPORTS, DOC_TYPES } from '../lib/const.js';
@@ -29,11 +22,9 @@ let currentDocType = null;
 let pollTimer = null;
 
 /**
- * The last dynamic view rendered, so a language switch (spec v3 §5.5) can
- * re-render exactly that state in the new language — without restarting
- * polling, resetting button state, or touching `extractedData` — instead of
- * guessing. `{kind: 'idle'}` means "nothing dynamic shown yet; the static
- * [data-i18n] labels are enough."
+ * The last dynamic view, so a language switch re-renders exactly that state
+ * without restarting polling or touching `extractedData`. 'idle' means the
+ * static [data-i18n] labels are all that is showing.
  */
 let currentView = { kind: 'idle' };
 
@@ -47,12 +38,8 @@ function stepModeForTransport(transport) {
 }
 
 /**
- * Turn an error-ish value into display text, preferring a translated
- * message over a raw one: an AppError-shaped value (`{code, params}`, from
- * background.js's structured response or a stored `{code, params, message}`
- * — spec v3 §5.3) translates via `code`; anything else falls back to its
- * own raw message, and only the caller-supplied fallback key is used if
- * there is truly nothing to show. Degrade, never blank.
+ * A `{code, params}` value translates via `code`; anything else falls back to
+ * its raw message, then to `fallbackKey`. Degrade, never blank.
  * @param {{code?: string, params?: object, message?: string}|Error|string|null|undefined} err
  * @param {string} fallbackKey
  * @returns {string}
@@ -64,7 +51,7 @@ function errorText(err, fallbackKey) {
     return err.message || I18n.t(fallbackKey);
 }
 
-/** Store the result and render it — shared by init recovery, polling recovery, and a live extraction. */
+/** Shared by init recovery, polling recovery and a live extraction. */
 function presentResult(data) {
     extractedData = data;
     view.setStepMode(stepModeForTransport(data.meta?.transport));
@@ -72,9 +59,9 @@ function presentResult(data) {
     view.renderExtractionResult(data);
 }
 
-// ── Language (spec v3 §5.2/§5.5) ───────────────────────────────────
+// ── Language ───────────────────────────────────────────────────────
 
-/** Load the persisted/detected language and apply it before the first render. */
+/** Applied before the first render. */
 export async function initI18n() {
     await I18n.init({ getStoredLanguage, detectLanguage, setStoredLanguage });
     view.setSelectedLanguage(I18n.getLanguage());
@@ -82,10 +69,8 @@ export async function initI18n() {
 }
 
 /**
- * Switch language and re-render immediately — no reopen (spec v3 §5.5).
- * Re-renders only the currently-visible dynamic state (via `currentView`)
- * with the same data, so an in-flight extraction's polling/timers and a
- * displayed result's `extractedData` are both left completely untouched.
+ * Re-renders only the visible state with the same data, so an in-flight
+ * extraction's timers and a shown result's data survive the switch.
  */
 export async function handleLanguageChange() {
     await I18n.setLanguage(view.getSelectedLanguage());
@@ -110,10 +95,9 @@ function rerenderCurrentView() {
     }
 }
 
-// ── Embed-images toggle (spec §4.4) ────────────────────────────────
-// Default ON — whether Google Docs accepts data: URI images on paste is
-// unverified (spec §8), so this checkbox is the escape hatch, not the
-// expected common case.
+// ── Embed-images toggle ────────────────────────────────────────────
+// Default ON. The checkbox is the escape hatch for a paste target that
+// rejects data: URIs, not the expected case.
 
 export async function initEmbedImagesToggle() {
     view.setEmbedImagesChecked(await getEmbedImages());
@@ -140,10 +124,8 @@ export async function init() {
         }
 
         if (statusResp?.status === EXTRACTION_STATUS.RUNNING) {
-            // The fetch transport (T1/T2) never navigates the tab, so it
-            // can't be the reason the popup needed recovering — a popup
-            // that had to poll back in almost certainly means the tabNav
-            // fallback fired and navigated the tab out from under it.
+            // The fetch tiers never navigate the tab, so a popup that had
+            // to poll back in means the tabnav fallback fired.
             setView('recoveryRunning');
             view.renderRecoveryRunning();
             startPolling();
@@ -158,8 +140,8 @@ export async function init() {
             currentDocType = response.data.type;
 
             if (response.data.type === DOC_TYPES.SLIDES) {
-                // D1: Slides has no working extraction path in P1 — don't
-                // let the user start a pipeline that can only fail.
+                // Slides has no working extraction path — do not start a
+                // pipeline that can only fail.
                 setView('slidesUnsupported');
                 view.renderSlidesUnsupported();
             } else {
@@ -205,8 +187,7 @@ export function stopPolling() {
 
 export async function handleExtract() {
     if (currentDocType === DOC_TYPES.SLIDES) {
-        // Defensive — the button should already be disabled (see init()),
-        // but never let this fall through to a pipeline that can't work.
+        // The button is already disabled in init(); this is the backstop.
         view.showNotification(I18n.t('error.slidesUnsupported'), 'error');
         return;
     }
@@ -214,12 +195,8 @@ export async function handleExtract() {
     view.beginExtractionUI();
 
     // Docs and Sheets both default to a transport that never touches the
-    // tab now (Docs: swFetch/csFetch, spec §3.2; Sheets: swFetch,
-    // unchanged) — the tab is never navigated, and the popup gets its
-    // result straight from this one response instead of via a
-    // navigation-triggered close/reopen. tabNav only runs as an explicit
-    // last-resort fallback if every fetch tier fails; if it does, we
-    // switch the display below once we know.
+    // tab, so the result arrives in this one response. tabnav runs only if
+    // every fetch tier fails, and the display switches below once we know.
     view.setStepMode('fetch');
 
     try {
@@ -248,12 +225,9 @@ export async function handleExtract() {
             throw new Error(errorText({ code: response?.code, params: response?.params, message: response?.error }, 'error.extractionFailed'));
         }
 
-        // Every fetch tier may have failed, in which case the background
-        // pipeline fell back to the legacy block-JS + navigate path
-        // (meta.warnings carries 'tabnav_fallback', surfaced via the
-        // warnings banner). The extraction has already finished by the
-        // time we learn this — presentResult() picks the matching step
-        // layout from response.data.meta.transport before rendering.
+        // If every tier failed the pipeline fell back to tabnav, and
+        // meta.warnings says so. presentResult() picks the step layout from
+        // meta.transport.
         presentResult(response.data);
 
     } catch (err) {

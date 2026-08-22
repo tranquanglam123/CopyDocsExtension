@@ -1,39 +1,13 @@
 /**
- * pipeline-runner.js — dispatch, the concurrency guard, the watchdog, the
- * startup sweep, and tab-removal cleanup (spec v3 P2). Moved from
- * background/service-worker.js's `ExtensionController`.
+ * Dispatch, concurrency guard, watchdog, startup sweep, tab-removal cleanup.
  *
- * Three transports exist for extraction:
+ * Three backends: via-fetch (Docs), via-csv (Sheets), via-tabnav (last
+ * resort). tabnav is last because blocking scripts breaks Google's cookie
+ * bootstrap, redirecting /mobilebasic to the "clear cache and cookies" page;
+ * a plain fetch reaches it directly.
  *
- *   docs   (fetch)    1. Validate URL → 2. http-transport.js's
- *                     fetchDocHtml() (T1 swFetch, then T2 csFetch) →
- *                     3. Offscreen parse → 4. Store result — no tab
- *                     touched, no DNR rule.
- *   sheets (swFetch)  1. Validate URL → 2. fetch({credentials:'include'}) →
- *                     3. Parse CSV → 4. Build HTML — no tab touched, no DNR
- *                     rule.
- *   docs   (tabNav)   LAST-RESORT FALLBACK ONLY, used when every fetch tier
- *                     fails: 1. Validate URL → 2. Allocate rule id →
- *                     3. Block JS → 4. Navigate → 5. Extract (content
- *                     script) → 6. Restore JS.
- *
- * BUG FIX (spec §3.2 T1/T2 pulled forward from P3): `docs` used to be
- * `tabNav`-only. In the real browser, blocking scripts on docs.google.com
- * and navigating to `/mobilebasic` now redirects to
- * support.google.com/accounts/answer/32050 ("clear cache and cookies"),
- * because blocking scripts breaks Google's own cookie/consent bootstrap.
- * The tab was hijacked for nothing and extraction hung until the 20s
- * timeout. `/mobilebasic` itself is fine — a plain fetch reaches it
- * directly, no navigation required. `tabNav` now runs only if fetching
- * fails outright — see `dispatchTransport` below and
- * http-transport.js's file header for the full measurement.
- *
- * The watchdog, the rule allocator (platform/net-rules.js) and the
- * startup sweep are the machinery that stops a tab being left
- * script-blocked if the service worker is killed mid-extraction (spec v3
- * §10 risk) — this file's `runWatchdog`/`startupSweep`/`handleTabRemoved`
- * are unchanged from the original service worker, only their imports
- * moved.
+ * The watchdog, the rule allocator and the startup sweep are what stop a tab
+ * being left script-blocked when the service worker is killed mid-extraction.
  */
 import { TIMING, WARNINGS, DOC_TYPES, TRANSPORTS, SESSION_KEYS, EXTRACTION_STATUS } from '../../lib/const.js';
 import { UrlTransformer } from '../../lib/url.js';
@@ -57,10 +31,8 @@ import { runTabNavPipeline } from './via-tabnav.js';
 const PIPELINE_TIMEOUT_MS = TIMING.PIPELINE_TIMEOUT_MS;
 
 /**
- * Shape an error for `platform/storage.js`'s `setExtractionError` (spec v3
- * §5.3): an AppError's `code`/`params` survive the round trip through
- * storage so a popup that recovers via `getExtractionStatus` can still
- * translate it; a plain Error degrades to its raw `message` only.
+ * An AppError's `code`/`params` survive storage so a recovering popup can
+ * still translate it; a plain Error degrades to its raw `message`.
  * @param {Error} err
  * @returns {{code?: string, params?: object, message: string}}
  */
@@ -71,17 +43,12 @@ function toStoredError(err) {
 }
 
 /**
- * Full extraction pipeline. Dispatches to the fetch (Docs), swFetch
- * (Sheets), or tabNav (Docs fallback) transport via `dispatchTransport`,
- * based on `targets.js`'s `toExtractionTarget()`.
+ * Full extraction pipeline, routed by `route.js`'s `toExtractionTarget()`.
  * @returns {Promise<{ title: string, text: string, charCount: number }>}
  */
 export async function runPipeline() {
-    // Concurrency guard (spec §6.3): a second startExtraction while one
-    // is genuinely in flight must not corrupt the persisted pipeline
-    // slot. A pipeline older than the watchdog timeout is NOT treated
-    // as "in progress" — it's stale, and the watchdog (or this very
-    // call, indirectly, by overwriting it) will clean it up.
+    // A second start must not corrupt the persisted slot. Older than the
+    // watchdog timeout is stale, not in progress.
     const existing = await PipelineState.get();
     if (existing && (Date.now() - existing.startedAt) < PIPELINE_TIMEOUT_MS) {
         throw new AppError('error.extractionInProgress');
@@ -112,25 +79,16 @@ export async function runPipeline() {
         return result;
     } catch (err) {
         await setExtractionError(toStoredError(err));
-        // Belt-and-suspenders: whichever sub-pipeline threw is
-        // responsible for its own cleanup in its `finally`, but make
-        // sure nothing lingers regardless of where it threw from.
+        // Each backend cleans up in its own `finally`; this catches a throw
+        // from anywhere else.
         await PipelineState.clear();
         throw err;
     }
 }
 
 /**
- * Route to the transport implied by `target.mode`.
- *
- *   'fetch'   → docs, via `runFetchHtmlPipeline` (T1/T2). Falls back to
- *               the legacy `runTabNavPipeline` (T3) if every fetch tier
- *               fails — never leaves a restricted Doc unextractable
- *               just because Google's cookie bootstrap breaks under
- *               DNR script-blocking (see the file header bug note).
- *   'swFetch' → sheets, via `runSwFetchPipeline`. Unchanged.
- *   anything else → legacy `tabNav`, kept for forward-compat with any
- *               strategy that explicitly asks for it.
+ * 'fetch' → via-fetch, falling back to via-tabnav when every tier fails.
+ * 'swFetch' → via-csv. Anything else → via-tabnav.
  *
  * @param {object} tab   The active tab (chrome tabs.Tab shape).
  * @param {{url: string, parser: string, mode: string}} target
@@ -157,10 +115,8 @@ export async function dispatchTransport(tab, target, docId) {
                 warnings: [...(result.meta?.warnings || []), WARNINGS.TABNAV_FALLBACK],
             };
 
-            // The fallback's own `finally` already stored `result` via
-            // storage.js — overwrite with the warning-annotated version
-            // so a popup that recovers via getExtractionStatus also sees
-            // it.
+            // The fallback already stored `result`; overwrite it with the
+            // warning-annotated version so a recovering popup sees it.
             await setExtractionComplete(result);
 
             return result;
@@ -171,11 +127,8 @@ export async function dispatchTransport(tab, target, docId) {
 }
 
 /**
- * Watchdog: fires every minute via the alarm registered in
- * platform/alarms.js. Any persisted pipeline older than PIPELINE_TIMEOUT_MS
- * is treated as
- * abandoned — almost certainly because the service worker that owned it
- * was terminated mid-flight — and is force-recovered (fixes D3).
+ * Fires every minute. A pipeline past PIPELINE_TIMEOUT_MS was abandoned by a
+ * terminated service worker, and is force-recovered.
  * @returns {Promise<void>}
  */
 export async function runWatchdog() {
@@ -203,10 +156,8 @@ export async function runWatchdog() {
 }
 
 /**
- * Startup / install sweep (spec §6.1): remove every session DNR rule
- * in the 9000-9999 band and clear allocator/pipeline state. Handles
- * the case where the BROWSER (not just the service worker) restarted
- * mid-extraction, which the watchdog alarm alone cannot catch.
+ * Drop every session DNR rule in the 9000-9999 band and clear allocator and
+ * pipeline state. Catches a BROWSER restart, which the alarm cannot.
  * @param {string} reason  'onStartup' | 'onInstalled' — for logging.
  * @returns {Promise<void>}
  */

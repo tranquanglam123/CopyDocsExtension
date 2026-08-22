@@ -1,18 +1,9 @@
 /**
- * DocxGenerator — Converts cleaned HTML into a proper .docx file
- * (Office Open XML / OOXML format, Office 2007+).
+ * Cleaned HTML to .docx (OOXML, Office 2007+) — a ZIP of [Content_Types].xml,
+ * _rels/.rels, word/document.xml, word/_rels/document.xml.rels, word/styles.xml.
  *
- * A .docx is a ZIP containing XML files:
- *   [Content_Types].xml
- *   _rels/.rels
- *   word/document.xml    ← the actual content
- *   word/_rels/document.xml.rels
- *   word/styles.xml      ← heading/body styles
- *
- * Lives in ui/ rather than core/ because it parses its input with `DOMParser`
- * and therefore only runs where a DOM exists — in practice, the popup. core/ is
- * reserved for modules `node --test` can exercise directly; this one cannot be.
- * Its pure dependency, the ZIP writer, stays in core/mini-zip.js.
+ * Lives in popup/ because it parses with `DOMParser` and so needs a realm with
+ * a DOM. Its pure dependency, the ZIP writer, stays in lib/zip.js.
  */
 
 import { MiniZip } from '../lib/zip.js';

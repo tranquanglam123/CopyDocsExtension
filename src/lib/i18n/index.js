@@ -1,23 +1,12 @@
 /**
- * i18n.js — runtime English/Vietnamese switching (spec v3 §5).
+ * Runtime English/Vietnamese switching. Chrome's `_locales` resolves from the
+ * browser UI language and cannot switch at runtime, so this replaces it.
  *
- * Chrome's native `_locales` mechanism resolves the locale from the browser
- * UI language and cannot be switched at runtime (spec v3 §5.1), so this is a
- * from-scratch implementation instead — one mechanism only, no `_locales`.
+ * Dictionaries are ES modules, not JSON: no fetch, no
+ * `web_accessible_resources`, and they load the same in every realm.
  *
- * Dictionaries are ES modules (`shared/locales/en.js`, `vi.js`), not JSON:
- * no fetch, no `web_accessible_resources`, and they load identically in the
- * popup and the service worker.
- *
- * This file lives under src/shared/, the bottom of the dependency graph: it
- * may not import from any layer above it and may not touch `chrome.*`. The
- * locale dictionaries are siblings inside shared/, so importing them is fine.
- *
- * Persisting the chosen language and detecting the browser's UI language both
- * need `chrome.storage`/`chrome.i18n`, which this file may not call. That
- * logic lives in `src/platform/language.js` and is *injected* into
- * `I18n.init()` by the popup bootstrap — `I18n` itself never knows chrome
- * exists, which is also what makes it testable under `node --test`.
+ * Persistence and UI-language detection need chrome, which lib/ may not call,
+ * so bridge/prefs.js injects them into `init()`.
  */
 
 import { dict as EN } from './en.js';
@@ -75,10 +64,8 @@ async function applyLanguage(lang, { persist }) {
 
 export const I18n = {
     /**
-     * Load the persisted language, else detect one, else fall back to
-     * English. Both dependencies are optional and chrome-free by design —
-     * see the file header — so this also works with no arguments at all
-     * (used directly by tests that only exercise `t()`/`apply()`).
+     * Persisted language, else detected, else English. Both dependencies are
+     * optional, so this works with no arguments at all.
      *
      * @param {{
      *   getStoredLanguage?: () => Promise<string|null>,
@@ -107,15 +94,13 @@ export const I18n = {
             }
         }
 
-        // The value just loaded is already what's persisted (or there was
-        // nothing to persist yet) — no need to write it straight back out.
+        // Already persisted, or nothing to persist yet.
         await applyLanguage(SUPPORTED_LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE, { persist: false });
     },
 
     /**
-     * Switch language and persist the choice (via the setter `init()` was
-     * given, if any). Callers re-render after this resolves — I18n itself
-     * has no DOM to re-render other than what `apply()` is given.
+     * Persists via the setter `init()` was given. Callers re-render after it
+     * resolves.
      * @param {string} lang
      * @returns {Promise<void>}
      */
@@ -129,9 +114,8 @@ export const I18n = {
     },
 
     /**
-     * Translate a key, interpolating `{name}` placeholders from `params`.
-     * A missing key returns the key itself and logs a warning — never
-     * blank; an untranslated label is a smaller bug than an invisible one.
+     * Interpolates `{name}` from `params`. A missing key returns the key —
+     * an untranslated label is a smaller bug than an invisible one.
      * @param {string} key
      * @param {object} [params]
      * @returns {string}
@@ -145,12 +129,8 @@ export const I18n = {
     },
 
     /**
-     * Fill every `[data-i18n]` (textContent), `[data-i18n-title]` (title
-     * attribute) and `[data-i18n-aria-label]` (aria-label attribute) element
-     * under `root`. The popup only ever needs `document`; `root` is a
-     * parameter rather than a bare global reference so this file never
-     * touches `document` itself — it works the same whether or not one
-     * exists in the calling context.
+     * Fill `[data-i18n]`, `[data-i18n-title]` and `[data-i18n-aria-label]`
+     * under `root`. `root` is a parameter so this file never names `document`.
      * @param {ParentNode} root
      */
     apply(root) {

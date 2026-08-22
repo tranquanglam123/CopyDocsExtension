@@ -1,45 +1,28 @@
 /**
- * binary-transport.js — Binary (image) fetch transport tiers (spec §4.1
- * T1/T2, added for v2.1). Split out of http-transport.js (spec v3 §2) —
- * same T1 swFetch → T2 csFetch ordering as the HTML transport, but images
- * are binary, not text, so this is a parallel set of helpers rather than a
- * reuse of `swFetch`/`csFetch` directly:
+ * Image fetch tiers, same swFetch → csFetch order as http.js. Images are
+ * binary, so these are parallel helpers, not a reuse of the text ones:
  *
- *   T1 swFetchBinary  fetch(url, {credentials:'include'}) from the service
- *                      worker, read as an ArrayBuffer.
- *   T2 csFetchBinary  script injection (via platform/scripting.js —
- *                      src/extraction/ itself stays free of Chrome APIs)
- *                      into the document's tab,
- *                      same-origin fetch, base64-encoded INSIDE the page
- *                      before returning — executeScript can only return
- *                      structured-cloneable values, not a Blob or
- *                      ArrayBuffer-with-transfer, so the page does the
- *                      encoding itself and hands back a plain string.
+ *   T1 swFetchBinary  fetch from the service worker, read as ArrayBuffer.
+ *   T2 csFetchBinary  same-origin fetch inside the tab, base64-encoded in
+ *                     the page — executeScript returns only cloneable values.
  *
- * Wall detection is reused (not reimplemented) from core/wall-detector.js's
- * `detectWall`: a response whose content-type isn't `image/*` might
- * genuinely be a non-bitmap resource (see image-embedder's own
- * content-type guard), or it might be a login/access-wall page served
- * instead of the asset. Only the latter should cause a fall-through to T2;
- * the former is a legitimate answer the embedder needs to see as-is. A
- * bounded prefix of the body is decoded to text and handed to `detectWall`
- * to tell the two apart, so a multi-megabyte image body is never decoded
- * as text just to classify it.
+ * A non-`image/*` content-type may be a genuine non-bitmap resource or a
+ * login wall served in its place. Only a wall falls through to T2, so a
+ * bounded prefix is decoded and handed to `detectWall` to tell them apart.
  */
 import { IMAGE_LIMITS } from '../../lib/const.js';
 import { detectWall, isImageContentType, SMALL_BODY_WALL_THRESHOLD } from '../../lib/wall.js';
 import { executeInTab } from '../../bridge/chrome/scripting.js';
 
-/** Per-tier network timeout for an image fetch (spec §4.2). */
+/** Per-tier network timeout for an image fetch. */
 const IMAGE_FETCH_TIMEOUT_MS = IMAGE_LIMITS.TIMEOUT_MS;
 
-/** How much decoded text (bytes) to sniff for a wall page (spec §4.1.3 note above). */
+/** How much decoded text to sniff for a wall page. */
 const WALL_SNIFF_BYTES = SMALL_BODY_WALL_THRESHOLD;
 
 /**
- * Base64-encode an ArrayBuffer without spreading it through
- * `String.fromCharCode(...bytes)` in one call, which blows the call stack
- * on multi-megabyte images.
+ * Chunked: `String.fromCharCode(...bytes)` in one call blows the stack on a
+ * multi-megabyte image.
  * @param {ArrayBuffer} buffer
  * @returns {string}
  */
@@ -54,10 +37,8 @@ function arrayBufferToBase64(buffer) {
 }
 
 /**
- * Decode a bounded prefix of a base64 payload back to text, purely to feed
- * `detectWall`. Never decodes the whole thing — a wall page is a few KB;
- * anything genuinely larger than that is not a wall page regardless of
- * what the rest of it contains.
+ * A bounded prefix only, to feed `detectWall`. A wall page is a few KB;
+ * anything larger is not one.
  * @param {string} base64
  * @returns {string}
  */
@@ -75,8 +56,7 @@ function decodeBase64TextPrefix(base64) {
 }
 
 /**
- * Race a promise against a timeout, resolving (never rejecting) to a
- * failure shape on timeout so callers don't need a try/catch just for this.
+ * Resolves, never rejects, so callers need no try/catch for a timeout.
  * @param {Promise<object>} promise
  * @param {number} ms
  * @returns {Promise<object>}
@@ -119,9 +99,8 @@ export async function swFetchBinary(url) {
 }
 
 /**
- * T2: fetch an image URL from inside the document's own tab, same-origin,
- * converting to base64 INSIDE the page (see file-header note — executeScript
- * cannot return a Blob).
+ * T2: same-origin fetch inside the tab, base64-encoded in the page because
+ * executeScript cannot return a Blob.
  * @param {number} tabId
  * @param {string} path  Same-origin URL to fetch, inside the tab.
  * @returns {Promise<{ok: boolean, base64: string, byteLength: number, contentType: string, status: number, finalUrl: string}>}
@@ -187,19 +166,12 @@ export async function csFetchBinary(tabId, path) {
 }
 
 /**
- * Fetch a binary image resource, trying T1 `swFetchBinary` then T2
- * `csFetchBinary` — same ordering and first-success-wins rule as
- * `fetchDocHtml`, deliberately NOT reimplemented inside
- * `extraction/image-embedder.js` (see that file). Per-image size budgeting
- * and the `image/*` content-type guard are the embedder's job (spec
- * §4.1.3/§4.2); this function only fetches and classifies wall-vs-not.
+ * T1 then T2, first success wins. Size budgeting and the `image/*` guard
+ * belong to image.js; this only fetches and classifies wall-vs-not.
  *
- * A non-2xx status, network error, or timeout counts as that tier failing.
- * A 2xx response with a non-`image/*` content-type is NOT automatically a
- * failure — it might be a genuine non-bitmap resource (spec §8 Q2) — unless
- * `detectWall` recognizes it as a login/access wall, in which case the next
- * tier is tried (the wall is a cookie/session problem T2's same-origin
- * fetch may not share).
+ * Non-2xx, network error or timeout fails that tier. A 2xx with a
+ * non-`image/*` type falls through only when `detectWall` calls it a wall —
+ * a cookie problem T2's same-origin fetch may not share.
  *
  * @param {{url: string, tabId?: number}} opts
  * @returns {Promise<{ok: boolean, base64: string, byteLength: number, contentType: string, status: number, finalUrl: string, transport: 'swFetch'|'csFetch', wallReason?: string}>}
@@ -212,8 +184,7 @@ export async function fetchBinary({ url, tabId }) {
         ? detectWall(decodeBase64TextPrefix(sw.base64), sw.finalUrl)
         : null;
     if (sw.ok && !swWall) {
-        // Breadcrumb for spec §8 Q3 ("which transport tier serves images")
-        // — see test/MANUAL-CHECKLIST.md Path D3.
+        // Breadcrumb for which tier actually serves images.
         console.log(`[Transport] swFetchBinary succeeded for ${url} (${sw.contentType || 'no content-type'}).`);
         return { ...sw, transport: 'swFetch' };
     }

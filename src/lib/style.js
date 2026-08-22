@@ -1,52 +1,21 @@
 /**
- * StyleFill — Pure logic for deciding what survives into an element's final
- * `style` attribute (spec v2.1 §3). Every function here takes and returns
- * plain strings/objects — no DOM, no `getComputedStyle` — so the decision
- * logic is unit-testable under plain `node --test` even though the CSS
- * cascade it is built to reason about only exists in a real browser.
+ * What survives into an element's final `style` attribute. Pure — the caller
+ * reads the DOM and hands plain values in.
  *
- * The offscreen parser (offscreen/parser.js) is the only caller. It reads
- * the DOM (authored `style` attribute text, `getComputedStyle` for the
- * element and its parent) and hands plain values in here; it must not
- * re-implement any of this decision logic inline (spec §6 file plan).
- *
- * ─── The rule (spec §3.1–§3.3), summarised ─────────────────────────────
- *
- *   1. BLOCKLIST, not whitelist: keep the entire authored `style` attribute
- *      verbatim except the small deny-list below (STYLE_DENY). A whitelist
- *      re-loses whatever Google adds next; a blocklist survives it.
- *
- *   2. Layout/geometry (`width`, `height`, `margin*`, `padding*`,
- *      `text-indent`) is AUTHORED ONLY. It is never filled from
- *      `getComputedStyle`, because the sandboxed iframe is not the user's
- *      page — a computed width is the iframe's used width, not the
- *      document's authored `30.6pt`. `buildElementStyle` enforces this
- *      simply by never consulting `computed`/`parentComputed` for anything
- *      outside `APPEARANCE_PROPERTIES`; there is no separate "layout" input.
- *
- *   3. Appearance/inherited properties (the explicit longhand list in
- *      `APPEARANCE_PROPERTIES`, §3.3) are authored if present; otherwise
- *      filled from the computed value, but only when it differs from the
- *      parent's computed value (so inherited values aren't restated on
- *      every node) and is not a meaningless CSS default
- *      (`isMeaninglessDefault`).
- *
- *   4. Never query a shorthand (`border`, `margin`, `padding`, `font`) via
- *      `getComputedStyle` — mobilebasic sets only longhands
- *      (`border-top-width`, `border-top-color`, ...), so a shorthand query
- *      silently returns `""` and the whole property is dropped (the F3
- *      defect this spec exists to fix). `APPEARANCE_PROPERTIES` lists
- *      longhands exclusively for this reason.
+ * The rules:
+ *   1. Blocklist, not whitelist. A whitelist re-loses whatever Google adds next.
+ *   2. Layout/geometry is authored only. A computed width is the sandbox
+ *      iframe's used width, not the document's authored `30.6pt`.
+ *   3. Appearance longhands fall back to the computed value, but only when it
+ *      differs from the parent's and is not a meaningless default.
+ *   4. Never query a shorthand: mobilebasic sets only longhands, so a
+ *      shorthand read returns `""` and the property is lost.
  */
 export class StyleFill {
 
     /**
-     * Deny-list (spec §3.1). Removed from the authored style regardless of
-     * where it came from. `display` is denied because mobilebasic sets
-     * `display:inline-block` on wrappers that reflow badly once the
-     * surrounding chrome is gone; `max-width`/`min-width`/etc. are denied
-     * because `.doc-content` carries a `770px` cap meant for the mobile
-     * viewport, not the pasted document.
+     * `display:inline-block` wrappers reflow badly once the chrome is gone;
+     * `.doc-content`'s `770px` cap is for the mobile viewport, not the paste.
      */
     static STYLE_DENY = new Set([
         'position', 'float', 'clear', 'overflow', 'overflow-x', 'overflow-y',
@@ -55,13 +24,8 @@ export class StyleFill {
         'max-width', 'min-width', 'max-height', 'min-height',
     ]);
 
-    /**
-     * Layout/geometry properties (spec §3.2 table, row 1). AUTHORED ONLY —
-     * never filled from computed style. Not consulted by `buildElementStyle`
-     * directly (the authored style already carries them verbatim if
-     * present); listed here so the rule is documented and testable in one
-     * place rather than left implicit.
-     */
+    /** Authored only, never filled from computed style. Listed so the rule
+     *  is testable in one place rather than left implicit. */
     static LAYOUT_PROPERTIES = new Set([
         'width', 'height',
         'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
@@ -69,11 +33,7 @@ export class StyleFill {
         'text-indent',
     ]);
 
-    /**
-     * Appearance/inherited properties eligible for the computed-fill pass
-     * (spec §3.3). Explicit longhands ONLY — see the F3 note in the module
-     * doc comment above for why shorthands are never listed here.
-     */
+    /** Eligible for the computed fill. Longhands only — see rule 4 above. */
     static APPEARANCE_PROPERTIES = [
         'color', 'background-color',
         'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
@@ -89,11 +49,8 @@ export class StyleFill {
     // ─── Style-string <-> plain-object helpers ─────────────────────────
 
     /**
-     * Parse a `style="..."` attribute string into a plain `{property: value}`
-     * object. Property names are lower-cased; declarations with no colon or
-     * an empty value are dropped. Splitting respects single/double-quoted
-     * segments (e.g. `font-family:"Times New Roman"`) so a quoted value can
-     * never be mistaken for a declaration boundary.
+     * Property names are lower-cased; empty or colon-less declarations drop.
+     * Quoted segments like `font-family:"Times New Roman"` split correctly.
      * @param {string} text
      * @returns {Object<string,string>}
      */
@@ -113,8 +70,7 @@ export class StyleFill {
     }
 
     /**
-     * Split a style-attribute string on top-level `;` only — a `;` inside a
-     * quoted string does not end the declaration.
+     * Top-level `;` only — a `;` inside quotes does not end a declaration.
      * @param {string} text
      * @returns {string[]}
      */
@@ -146,9 +102,8 @@ export class StyleFill {
     }
 
     /**
-     * Serialise a plain `{property: value}` object back into a
-     * `style="..."` attribute string (without the surrounding quotes).
-     * Empty/nullish values are skipped. Insertion order is preserved.
+     * Back to an attribute string, quotes excluded. Empty values are skipped,
+     * insertion order preserved.
      * @param {Object<string,string>} styleObj
      * @returns {string}
      */
@@ -164,11 +119,9 @@ export class StyleFill {
         return parts.join(';');
     }
 
-    // ─── Deny-list filter (spec §3.1) ──────────────────────────────────
+    // ─── Deny-list filter ──────────────────────────────────────────────
 
     /**
-     * Remove every `STYLE_DENY` property from a plain style object. Pure —
-     * takes and returns plain objects, no DOM involved.
      * @param {Object<string,string>} styleObj
      * @returns {Object<string,string>}
      */
@@ -181,19 +134,14 @@ export class StyleFill {
         return result;
     }
 
-    // ─── Meaningless-default detection (spec §3.3, last paragraph) ─────
+    // ─── Meaningless-default detection ─────────────────────────────────
 
     /**
-     * Decide whether a *computed* value for `property` is a CSS default
-     * that carries no meaning and should never be emitted even when it
-     * differs from the parent's computed value (e.g. the parent has no
-     * border at all, so `border-top-width` differs from the parent's `0px`
-     * only in the sense that the parent's value is `medium`/absent — both
-     * are "no border").
+     * A computed default worth nothing even when it differs from the parent:
+     * `border-top-width:0px` against a parent's `medium` is still no border.
      *
-     * Only used for *computed* fills — an authored value is always kept
-     * verbatim regardless of whether it happens to equal a CSS default,
-     * because the author wrote it deliberately.
+     * Computed fills only — an authored value is kept verbatim, defaults
+     * included, because the author wrote it deliberately.
      *
      * @param {string} property  Lower-case longhand property name.
      * @param {string} value     A resolved (computed) value.
@@ -235,16 +183,11 @@ export class StyleFill {
         return /^0(px|pt|em|rem|%)?$/.test(v);
     }
 
-    // ─── Parent-diff decision (spec §3.2 row 2, §3.3 last paragraph) ───
+    // ─── Parent-diff decision ──────────────────────────────────────────
 
     /**
-     * Decide the value (if any) to emit for one appearance property, given
-     * its own computed value and the parent's computed value. This is the
-     * "diffed against the parent" rule: skip when it matches the parent
-     * (inherited, not worth restating) or when it is a meaningless default.
-     *
-     * Callers only invoke this for a property that is NOT already present
-     * in the authored style — authored always wins (see `buildElementStyle`).
+     * Skip when the value matches the parent (inherited, not worth restating)
+     * or is a meaningless default. Called only where the author set nothing.
      *
      * @param {{property: string, own: string|undefined|null, parent?: string|undefined|null}} args
      * @returns {string|null}  The value to emit, or `null` to emit nothing.
@@ -265,16 +208,9 @@ export class StyleFill {
     // ─── Orchestration ──────────────────────────────────────────────────
 
     /**
-     * Build the final style object for one element: authored style (minus
-     * `STYLE_DENY`) plus a computed fill for any `APPEARANCE_PROPERTIES`
-     * entry the author did not already set. Pure — `computed`/`parentComputed`
-     * are plain `{property: value}` objects (as produced by reading
-     * `getComputedStyle(...).getPropertyValue(...)` for each entry in
-     * `APPEARANCE_PROPERTIES`, done by the caller), not live DOM objects.
-     *
-     * Layout/geometry properties are never added here beyond whatever the
-     * authored style already contained — there is no computed source for
-     * them by design (spec §3.2).
+     * Authored style minus `STYLE_DENY`, plus a computed fill for any
+     * appearance longhand the author left unset. `computed`/`parentComputed`
+     * are plain objects, not live DOM.
      *
      * @param {{authoredStyleText?: string, computed?: Object<string,string>, parentComputed?: Object<string,string>}} args
      * @returns {Object<string,string>}

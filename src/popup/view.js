@@ -1,14 +1,6 @@
 /**
- * popup-view.js — every DOM write the popup makes.
- *
- * This module owns all `document.getElementById` lookups and all element
- * mutation. It never calls `chrome.*` and never decides *what* to show —
- * every function here is a setter driven entirely by the arguments it is
- * given. The flow decisions (what state the popup is in, when to poll, when
- * to disable a button because of *why*) belong to popup-controller.js.
- *
- * Split out of entry/popup.js (spec v3 §4 P2) — same DOM ids, same classes,
- * same visual result, just relocated.
+ * Every DOM write the popup makes. Each function is a setter driven entirely
+ * by its arguments; what state to be in is controller.js's decision.
  */
 
 import { WARNINGS, WARNING_PREFIXES } from '../lib/const.js';
@@ -41,11 +33,8 @@ const warningsText = document.getElementById('warnings-text');
 const chkEmbedImages = document.getElementById('chk-embed-images');
 const langSelect = document.getElementById('lang-select');
 
-/**
- * The handful of elements the entry file needs handles to for
- * `addEventListener` — wiring listeners is entry/popup.js's job (spec v3
- * §4 P2), everything else about these nodes stays private to this module.
- */
+/** Handles main.js needs for `addEventListener`. Every other node stays
+ *  private to this module. */
 export const elements = {
     btnExtract,
     btnCopy,
@@ -56,7 +45,7 @@ export const elements = {
     langSelect,
 };
 
-// ── i18n (spec v3 §5) ──────────────────────────────────────────────
+// ── i18n ───────────────────────────────────────────────────────────
 
 /** Fill every [data-i18n]/[data-i18n-title]/[data-i18n-aria-label] element. */
 export function applyStaticI18n() {
@@ -73,19 +62,12 @@ export function setSelectedLanguage(lang) {
     langSelect.value = lang;
 }
 
-// ── Warnings (meta.warnings from the extraction result) ───────────
-// Never silent: an unrecognized warning code still renders verbatim
-// instead of being swallowed.
-//
-// Codes come from shared/constants.js (spec v3 §4 T2) so a typo can't
-// silently desync the popup from what the pipelines actually emit. Each
-// maps to an i18n key (`warning.<code>`, spec v3 §5.4) rather than an
-// English sentence, so it renders translated regardless of language.
-// `low_confidence` and `multi_tab_partial` have no entry in
-// shared/constants.js WARNINGS — they are not produced anywhere in the
-// codebase today — so they stay as literal keys here rather than being
-// invented in the shared constants file; both still have en/vi message
-// keys (test/i18n.test.js only requires the constants.js-listed codes).
+// ── Warnings ──────────────────────────────────────────────────────
+// Never silent: an unrecognized code renders verbatim. Codes come from
+// lib/const.js so a typo cannot desync the popup from the pipelines, and
+// each maps to a `warning.<code>` key rather than an English sentence.
+// `low_confidence` and `multi_tab_partial` stay literal — nothing emits them
+// yet, so they are not invented in const.js, but both have en/vi keys.
 
 const WARNING_KEYS = {
     [WARNINGS.SINGLE_SHEET_ONLY]: 'warning.single_sheet_only',
@@ -100,8 +82,8 @@ const WARNING_KEYS = {
     multi_tab_partial: 'warning.multi_tab_partial',
 };
 
-// Warning codes that carry a dynamic `:<n>` count suffix (spec §4.3) —
-// matched by prefix, the count is interpolated as the `{count}` param.
+// Codes carrying a `:<n>` suffix, matched by prefix; the count becomes the
+// `{count}` param.
 const WARNING_PREFIX_KEYS = [
     { prefix: `${WARNING_PREFIXES.IMAGE_EMBED_FAILED}:`, key: 'warning.image_embed_failed' },
     { prefix: `${WARNING_PREFIXES.IMAGE_NOT_BITMAP}:`, key: 'warning.image_not_bitmap' },
@@ -130,7 +112,7 @@ export function showWarnings(warnings) {
     warningsBanner.classList.remove('hidden');
 }
 
-// ── Embed-images toggle (spec §4.4) ────────────────────────────────
+// ── Embed-images toggle ────────────────────────────────────────────
 
 export function setEmbedImagesChecked(checked) {
     chkEmbedImages.checked = checked;
@@ -141,11 +123,8 @@ export function getEmbedImagesChecked() {
 }
 
 // ── Step IDs ────────────────────────────────────────────────────
-// Two sequences, matching what actually happens. The fetch transport
-// (T1 swFetch / T2 csFetch — spec §3.2, pulled forward from P3) never
-// touches the tab, so there's no "Block JS" / "Navigate" step to show for
-// it. tabNav is now a last-resort fallback only, kept for when it fires
-// (see entry/background.js dispatchTransport).
+// Two sequences. The fetch tiers never touch the tab, so they have no
+// "Block JS" / "Navigate" step; tabnav shows one when it fires.
 
 const STEPS_FETCH = ['step-validate', 'step-fetch', 'step-parse', 'step-done'];
 const STEPS_TABNAV = ['step-validate', 'step-block', 'step-navigate', 'step-extract', 'step-done'];
@@ -205,11 +184,10 @@ function truncateUrl(url, max = 45) {
 }
 
 // ── Composite renders ───────────────────────────────────────────
-// Fixed DOM-write sequences ported verbatim from the original popup.js —
-// each one renders a single, named popup state. The *decision* to enter
-// that state still belongs to the controller; these only apply it.
+// One named popup state each. Entering that state is the controller's
+// decision; these only apply it.
 
-/** Reset UI for a freshly started extraction (was inline in handleExtract). */
+/** Reset UI for a freshly started extraction. */
 export function beginExtractionUI() {
     btnExtract.disabled = true;
     progressSection.classList.remove('hidden');
@@ -219,7 +197,7 @@ export function beginExtractionUI() {
     warningsBanner.classList.add('hidden');
 }
 
-/** Render a completed extraction result (was showExtractionResult). */
+/** Render a completed extraction result. */
 export function renderExtractionResult(data) {
     progressSection.classList.remove('hidden');
     setStep(activeSteps.length - 1);
@@ -236,7 +214,7 @@ export function renderExtractionResult(data) {
     showNotification(I18n.t('popup.notify.ready', { title: data.title }), 'success');
 }
 
-/** Popup reopened while a tabNav-fallback extraction is still running. */
+/** Popup reopened while a tabnav-fallback extraction is still running. */
 export function renderRecoveryRunning() {
     progressSection.classList.remove('hidden');
     setStepMode('tabnav');

@@ -1,28 +1,6 @@
 /**
- * image-embedder.js — embed a document's own `docs.google.com` images as
- * inline `data:` URIs (spec §4).
- *
- * WHY: the six images in the user's real restricted Doc — one
- * `docs.google.com/drawings/d/…` (a red rounded title block) and five
- * `docs.google.com/docs-images-rt/…` (rendered equations/pictures) — sit
- * behind the user's cookies. A bare `<img src="https://docs.google.com/…">`
- * in the clipboard does not survive a paste into a different context, and
- * Google's own HTML importer cannot fetch a restricted document's assets on
- * the user's behalf. So each image is fetched through the same T1/T2
- * transport tiers used for the document HTML itself
- * (`lib/transport.js` `fetchBinary`) and rewritten in place to a
- * self-contained `data:` URI.
- *
- * This module has NO DOM dependency — it runs in the service worker, which
- * has none — and operates on `bodyHtml` as a string via regex, touching
- * only the `src="…"` portion of each `<img>` tag it rewrites. Every other
- * attribute (`width`, `height`, `style`, …) is left byte-for-byte alone,
- * which is what preserves sizing for the (deferred, v2.2) DOCX writer.
- *
- * Every failure mode here is non-fatal by design (spec §4.2): a fetch that
- * fails, times out, returns something that isn't a bitmap, or would blow a
- * size budget leaves the original `src` in place and adds a warning.
- * Losing an image must never lose the document.
+ * `docs.google.com` images sit behind the user's cookies and do not survive
+ * a paste, so inline them as `data:` URIs. Failure keeps the original src.
  */
 
 import { IMAGE_LIMITS, WARNINGS, WARNING_PREFIXES } from '../../lib/const.js';
@@ -32,29 +10,23 @@ import { isEmbedImagesEnabled } from '../../bridge/chrome/storage.js';
 
 export class ImageEmbedder {
 
-    /** Per-image decoded-size cap (spec §4.2). */
+    /** Per-image decoded-size cap. */
     static PER_IMAGE_MAX_BYTES = IMAGE_LIMITS.PER_IMAGE_MAX_BYTES;
 
-    /** Total decoded-size budget across all images in one document (spec §4.2). */
+    /** Decoded-size budget across all images in one document. */
     static TOTAL_BUDGET_BYTES = IMAGE_LIMITS.TOTAL_BUDGET_BYTES;
 
-    /** Max simultaneous in-flight image fetches (spec §4.2). */
+    /** Max simultaneous in-flight image fetches. */
     static MAX_CONCURRENT = IMAGE_LIMITS.MAX_CONCURRENT;
 
-    /**
-     * Per-image timeout applied here as well as inside the transport tiers
-     * (spec §4.2 "8s timeout each") — belt-and-suspenders so a caller that
-     * injects its own `fetchFn` (tests; or a future transport) can't stall
-     * the whole embed pass just because it forgot to time out internally.
-     */
+    /** Also applied inside the transports, so an injected fetchFn that
+     *  forgets to time out cannot stall the pass. */
     static TIMEOUT_MS = IMAGE_LIMITS.TIMEOUT_MS;
 
     // ─── Entry point ────────────────────────────────────────────────────
 
     /**
-     * Find every `<img>` whose `src` is a `docs.google.com` URL, fetch it,
-     * and rewrite `src` to a `data:` URI in place. Never throws — every
-     * failure degrades to "leave the original src, add a warning".
+     * Rewrite every `docs.google.com` `<img src>` to a `data:` URI. Never throws.
      *
      * @param {string} bodyHtml
      * @param {{
@@ -65,10 +37,8 @@ export class ImageEmbedder {
      *   perImageMaxBytes?: number,
      *   timeoutMs?: number,
      * }} [opts]
-     *   `fetchFn` defaults to `fetchBinary` from `lib/transport.js` (T1/T2).
-     *   Overridable purely so `test/image-embedder.test.js` can exercise
-     *   the collection/guard/budget logic under plain `node --test` without
-     *   any Chrome API.
+     *   `fetchFn` defaults to `fetchBinary`; overridable so tests run the
+     *   collection/guard/budget logic without any Chrome API.
      * @returns {Promise<{bodyHtml: string, stats: {
      *   totalFound: number, embedded: number, notBitmap: number, failed: number,
      *   budgetExceeded: boolean, totalBytes: number, warnings: string[],
@@ -119,9 +89,7 @@ export class ImageEmbedder {
     // ─── Collection (pure) ──────────────────────────────────────────────
 
     /**
-     * Collect every `<img src="…">` in `bodyHtml` whose `src` host is
-     * exactly `docs.google.com`. Pure string/regex logic — no DOM, so this
-     * is directly unit-testable under plain `node --test`.
+     * Every `<img src="…">` whose host is exactly `docs.google.com`.
      *
      * @param {string} bodyHtml
      * @returns {Array<{start: number, end: number, tag: string, src: string}>}
@@ -183,11 +151,8 @@ export class ImageEmbedder {
     // ─── Fetch + budget (needs fetchFn; pure given an injected one) ─────
 
     /**
-     * Fetch every collected image (bounded concurrency) and decide the
-     * outcome of each: 'embed' | 'not-bitmap' | 'budget' | 'budget-skip' | 'fail'.
-     * Per-image and total budgets are enforced here — once either is hit,
-     * every image not yet started is marked 'budget-skip' without being
-     * fetched at all (spec §4.2 "over budget → keep the original URL, warn").
+     * Outcome per image: embed | not-bitmap | budget | budget-skip | fail.
+     * Past a budget, images not yet started are never fetched.
      *
      * @param {Array<{src: string}>} images
      * @param {{tabId?: number, fetchFn: Function, maxConcurrent: number, perImageMaxBytes: number, budgetBytes: number, timeoutMs: number}} cfg
@@ -272,9 +237,8 @@ export class ImageEmbedder {
     // ─── Apply outcomes back into bodyHtml (pure) ───────────────────────
 
     /**
-     * Rebuild `bodyHtml` with each 'embed' outcome's `src` rewritten to a
-     * `data:` URI, tallying `stats` as it goes. Every other outcome leaves
-     * the original tag byte-for-byte untouched.
+     * Rebuild `bodyHtml`, rewriting only 'embed' outcomes. Other tags stay
+     * byte-for-byte.
      *
      * @param {string} bodyHtml
      * @param {Array<{start:number, end:number, tag:string}>} images
@@ -316,9 +280,7 @@ export class ImageEmbedder {
     }
 
     /**
-     * Replace only the `src="…"` portion of an `<img>` tag, leaving every
-     * other attribute (`width`, `height`, `style`, …) untouched (spec
-     * §4.1.5 — the deferred DOCX writer needs them later).
+     * Replace only `src="…"`; `width`, `height`, `style` stay untouched.
      * @param {string} tag
      * @param {string} mime
      * @param {string} base64
@@ -347,24 +309,11 @@ export class ImageEmbedder {
     }
 }
 
-// ─── embedImagesIntoResult — wire into a full extraction result ────────────
-// Moved from background/service-worker.js's `ExtensionController` (spec v3
-// P2). Shared by extraction/fetch-pipeline.js and
-// extraction/tabnav-pipeline.js — the two Docs pipelines whose parse
-// produces `bodyHtml`. Never used by csv-pipeline.js (csv-derived HTML has
-// no `<img>` tags to begin with).
+// ─── Wire into a full extraction result ───────────────────────────────────
 
 /**
- * Embed the document's own `docs.google.com` images as `data:` URIs
- * into `result.bodyHtml` (spec §4), honouring the popup's "Embed
- * images" toggle (`isEmbedImagesEnabled`, platform/storage.js, default
- * ON). Called after every offscreen parse that produces Docs `bodyHtml`
- * — never for Sheets and never when the offscreen parse itself failed
- * (nothing to embed into).
- *
- * `ImageEmbedder.embedImages` never throws — every fetch failure
- * degrades to "keep the original src, add a warning" (spec §4.2) — so
- * the try/catch here is defense in depth only, not the real safety net.
+ * For the two Docs pipelines; via-csv.js has no `<img>` tags. Honours the
+ * popup's embed toggle, default ON.
  *
  * @param {object} result   The parse-result contract ({title, text, html, bodyHtml, charCount, meta}).
  * @param {number|undefined} tabId  The document's own tab — needed for the T2 csFetch fallback.
@@ -396,9 +345,8 @@ export async function embedImagesIntoResult(result, tabId) {
 
     const { bodyHtml: newBodyHtml, stats } = embedResult;
 
-    // The clipboard's text/html flavour is `result.html`, not
-    // `result.bodyHtml` (spec §5) — it must carry the same embedded
-    // images, so rebuild it around the new bodyHtml too.
+    // The clipboard's text/html flavour is `result.html`, so it needs the
+    // same embedded images.
     const newHtml = _spliceBodyHtml(result.html, oldBodyHtml, newBodyHtml);
 
     return {
@@ -414,17 +362,8 @@ export async function embedImagesIntoResult(result, tabId) {
 }
 
 /**
- * Replace the (single, verbatim) `oldBodyHtml` substring inside
- * `fullHtml` with `newBodyHtml`. `fullHtml` is produced by
- * core/html-document.js's `wrapAsDocument(bodyHtml, title)` — a fixed
- * head/body shell around exactly one copy of `bodyHtml` — so locating
- * that substring and splicing is equivalent to (and far cheaper than)
- * re-running the wrap template.
- *
- * Deliberately uses indexOf + slice, not `String.replace` — `replace`'s
- * string form treats `$&`/`$1`/`$$`/... specially in the REPLACEMENT
- * text, and `newBodyHtml` is untrusted document content that could
- * legitimately contain a literal `$1` (e.g. a price).
+ * indexOf + slice, not `String.replace`: `replace` treats `$&`/`$1`/`$$` in
+ * the replacement specially, and document content can contain a literal `$1`.
  *
  * @param {string} fullHtml
  * @param {string} oldBodyHtml
