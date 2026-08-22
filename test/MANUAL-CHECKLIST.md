@@ -245,7 +245,7 @@ directly from the service worker console, no experimentation needed.
 ## What is NOT covered by this checklist
 
 - The structural container-detection **fallback** (`src/lib/score.js`
-  scoring path) only activates when none of `OffscreenParser.CONTAINER_SELECTORS`
+  scoring path) only activates when none of `CONTAINER_SELECTORS` in `src/offscreen/pass/container.js`
   match — the bundled fixture's `div.doc-content#contents` hits the fast
   path. To exercise the fallback manually, strip the fixture's
   `class="doc-content" id="contents"` attributes and re-run Path A; the
