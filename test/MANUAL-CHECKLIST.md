@@ -3,7 +3,7 @@
 Node has no CSS engine, so `node --test` can exercise the pure decision
 logic (`src/lib/emphasis.js`, `src/lib/score.js`) but **cannot**
 run a real cascade end-to-end. This checklist is the D2 regression test
-(spec §11: *"feed a saved mobilebasic HTML fixture with class-based
+(*"feed a saved mobilebasic HTML fixture with class-based
 font-weight:700 and assert `<b>` appears in bodyHtml"*) run against a real
 Chrome DOM instead.
 
@@ -65,7 +65,7 @@ directly instead of going through `chrome.offscreen.createDocument`.
    `response.data.bodyHtml` through `DocxGenerator.generate(bodyHtml, response.data.title)`
    (e.g. from the popup's console once wired) and open the resulting
    `.docx` in Word/LibreOffice — confirm bold/italic/underline actually
-   render, closing the loop on acceptance criterion #2 in the spec
+   render, closing the loop on the formatting-fidelity criterion
    ("Bold, italic, headings, lists and tables survive into the DOCX").
 
 ---
@@ -128,14 +128,14 @@ supported yet and must not start a pipeline.
 
 ---
 
-## Path D — image embedding (spec §4, v2.1)
+## Path D — image embedding
 
 `src/background/extract/image.js` and the binary-fetch tiers in `src/background/extract/http.js`
 (`swFetchBinary`/`csFetchBinary`/`fetchBinary`) have full pure-logic coverage
-under `node --test` (`test/image-embedder.test.js`: URL collection, the
+under `node --test` (`test/image.test.js`: URL collection, the
 content-type guard, both budgets, failed fetches — all against an injected
 `fetchFn`, never the real network). What `node --test` categorically **cannot**
-answer is spec §8's three unverified questions, because they depend on a real
+answer is the three questions below, because they depend on a real
 Chrome, a real restricted Google Doc, and Google's own paste importer. Run
 Path D against **the user's actual restricted Unit-1 document** (the one with
 the six images: one `docs.google.com/drawings/d/…` title block, five
@@ -148,7 +148,7 @@ checked (it's ON by default) → open two DevTools consoles side by side: one
 on the popup (right-click the popup → Inspect), one on the service worker
 (the "service worker" link on the CopyDocExt card in `chrome://extensions`).
 
-### D1 — Does Google Docs accept `data:` URI images on paste? (spec §8 Q1)
+### D1 — Does Google Docs accept `data:` URI images on paste?
 
 This is the question the whole "Embed images" toggle exists to hedge against.
 
@@ -181,9 +181,9 @@ This is the question the whole "Embed images" toggle exists to hedge against.
      confirmed not to work, the toggle's **default** should flip from ON to
      OFF in a follow-up change — that decision needs this result, not a guess.
 
-### D2 — Does `docs.google.com/drawings/d/…` return a bitmap? (spec §8 Q2)
+### D2 — Does `docs.google.com/drawings/d/…` return a bitmap?
 
-The content-type guard (§4.1.3) makes a wrong answer harmless (the original
+The content-type guard makes a wrong answer harmless (the original
 link is kept, `image_not_bitmap` is warned), but the answer decides whether
 the red title block can ever survive at all, embedded or not.
 
@@ -208,12 +208,12 @@ the red title block can ever survive at all, embedded or not.
    A `content-type` starting with `text/html` confirms the drawings endpoint
    is a viewer page, not an image — matching the guard's decision.
 4. **If it's not a bitmap:** there is no code fix available in this pass
-   (spec §11 accepts this as a known risk — text drawn inside a drawing isn't
+   (a known risk — text drawn inside a drawing isn't
    recoverable from `/mobilebasic` at all). Confirm instead that the failure
    is *visible*, not silent: the popup's warnings banner must show a
    human-readable message for `image_not_bitmap:<n>`, not just swallow it.
 
-### D3 — Which transport tier serves images: `swFetch` or `csFetch`? (spec §8 Q3)
+### D3 — Which transport tier serves images: `swFetch` or `csFetch`?
 
 `src/background/extract/http.js` `fetchBinary` logs every attempt — this is answerable
 directly from the service worker console, no experimentation needed.
@@ -230,7 +230,7 @@ directly from the service worker console, no experimentation needed.
 5. **If some end in neither** (both `swFetchBinary failed` and
    `csFetchBinary failed` for the same URL): that image degrades to
    `image_embed_failed` — confirm the warning banner shows it, and confirm
-   the document/paste still succeeds otherwise (spec §4.2 — losing one image
+   the document/paste still succeeds otherwise (losing one image
    must never lose the document). Check the failure reason logged
    (`HTTP <status>` vs. a wall reason like `cookies_help_redirect`) to tell a
    genuine network failure apart from a session/cookie problem.

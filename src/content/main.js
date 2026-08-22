@@ -1,12 +1,9 @@
 /**
- * content.js — content script injected into /mobilebasic pages (spec v3
- * §4 P3). Readiness detection only; src/entry/offscreen.js is the single
- * parser in the codebase now — DOMScanner and its in-page fallback parse
- * are deleted, so an offscreen-parser failure is fatal to this extraction
- * (see extraction/tabnav-pipeline.js's `handleContentReady`). Not an ES
- * module (manifest.json's content_scripts entry has no "type": "module"),
- * so this stays a plain IIFE — the literals below can't be sourced from
- * shared/constants.js for that reason.
+ * Content script for /mobilebasic pages. Readiness detection only — the
+ * offscreen document is the single parser, so its failure is fatal here.
+ *
+ * MV3 content scripts are not ES modules, so this is a plain IIFE and the
+ * literals below cannot come from lib/const.js.
  */
 (() => {
     'use strict';

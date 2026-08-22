@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { ContainerScore } from '../src/lib/score.js';
 
 // Pure scoring logic for the structural container-detection fallback
-// (spec §4.3): score = textLength * (1 - linkDensity) * (1 + 0.1 * paragraphCount),
+// score = textLength * (1 - linkDensity) * (1 + 0.1 * paragraphCount),
 // excluding nav/header/footer/aside. No DOM involved — the offscreen
 // parser's _scoreCandidates() is the thin DOM-walking wrapper that measures
 // real elements and feeds them here.
 
 describe('ContainerScore.scoreCandidate', () => {
-    test('matches the spec formula for a plain candidate', () => {
+    test('matches the formula for a plain candidate', () => {
         // textLength=1000, linkTextLength=0, paragraphCount=5, tagName=DIV
         // score = 1000 * (1 - 0) * (1 + 0.1*5) = 1000 * 1.5 = 1500
         const score = ContainerScore.scoreCandidate({

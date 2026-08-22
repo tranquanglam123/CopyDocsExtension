@@ -1,15 +1,7 @@
 /**
- * Shared constants — the single source of truth for every value that more
- * than one layer has to agree on (spec v3 §4 P3).
- *
- * These used to be string literals repeated across files: `'embedImagesEnabled'`
- * was hardcoded in both the service worker and the popup, and warning codes were
- * written out by hand wherever they were produced and again wherever they were
- * rendered. A typo in one copy fails silently — the toggle stops persisting, or
- * a warning renders as its raw code — so they live here instead.
- *
- * Nothing in this file may import anything: it is the bottom of the dependency
- * graph.
+ * Every value more than one layer has to agree on. A typo in a duplicated
+ * literal fails silently: the toggle stops persisting, or a warning renders
+ * as its raw code. Nothing here may import anything.
  */
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
@@ -30,7 +22,7 @@ export const SESSION_KEYS = Object.freeze({
 
 /** `chrome.storage.local` — survives browser restarts. */
 export const LOCAL_KEYS = Object.freeze({
-    /** Popup toggle: inline images as data: URIs (spec v2.1 §4.4). */
+    /** Popup toggle: inline images as data: URIs. */
     EMBED_IMAGES: 'embedImagesEnabled',
     /** Selected UI language ('en' | 'vi'), set from the popup. */
     LANGUAGE: 'uiLanguage',
@@ -46,12 +38,8 @@ export const EXTRACTION_STATUS = Object.freeze({
 });
 
 // ─── Warning codes ──────────────────────────────────────────────────────────
-//
-// Produced by the pipelines/parser, rendered by the popup. Codes — never
-// English sentences — so they can be translated (spec v3 §5.4).
-//
-// `image_embed_failed` and `image_not_bitmap` are emitted with a `:<count>`
-// suffix (e.g. `image_not_bitmap:2`); the popup matches them by prefix.
+// Codes, never English sentences, so the popup can translate them.
+// `image_embed_failed` and `image_not_bitmap` carry a `:<count>` suffix.
 
 export const WARNINGS = Object.freeze({
     /** Only sheet gid=0 was read from a multi-sheet spreadsheet. */
@@ -113,7 +101,7 @@ export const IMAGE_LIMITS = Object.freeze({
     TIMEOUT_MS: 8_000,
 });
 
-/** Above this, the computed-style fill is skipped (spec v2.1 §3.6). */
+/** Above this, the computed-style fill is skipped. */
 export const STYLE_FILL_MAX_BYTES = 4 * 1024 * 1024;
 
 // ─── Document types ─────────────────────────────────────────────────────────

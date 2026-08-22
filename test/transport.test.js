@@ -1,11 +1,11 @@
 /**
  * Unit tests for lib/transport.js — the pure `detectWall` function only
  * (`swFetch`/`csFetch`/`fetchDocHtml` need live Chrome APIs and are covered
- * by the manual checklist, per spec §11). Zero dependencies, run with:
+ * by the manual checklist, per the rules). Zero dependencies, run with:
  *
  *   node --test test/
  *
- * These must not require Chrome APIs (spec §11).
+ * These must not require Chrome APIs.
  */
 
 import test from 'node:test';

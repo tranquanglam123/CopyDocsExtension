@@ -1,15 +1,8 @@
 /**
- * vi.js — Vietnamese strings (spec v3 §5). Must carry exactly the same key
- * set as en.js (enforced by test/i18n.test.js) — a new English string here
- * with no counterpart there fails the build, not just at review time.
+ * Exactly the same key set as en.js, enforced by test/i18n.test.js.
  *
- * Written for a Vietnamese reader, not translated word-for-word from the
- * English column: product names (Google Doc/Sheet/Slides) and developer
- * terms (URL, HTTP, CSV, gviz, JS, content script, .docx/.txt, Ctrl+V) are
- * left in English, matching how Vietnamese developers actually talk about
- * them.
- *
- * Plain data only — no imports, no chrome.* (src/shared/, spec v3 §8).
+ * Written for a Vietnamese reader, not word-for-word: product names and
+ * developer terms stay in English, as Vietnamese developers say them.
  */
 export const dict = {
     // ─── Static popup chrome (filled via I18n.apply(), data-i18n*) ────────
@@ -35,7 +28,7 @@ export const dict = {
     'popup.docxNote': 'Lưu ý: hình ảnh chưa được đưa vào file .docx tải xuống — hãy dùng Sao chép hoặc Tài liệu mới để giữ lại hình ảnh.',
     'popup.footer.languageLabel': 'Ngôn ngữ',
 
-    // ─── Dynamic status card (I18n.t() from ui/popup-view.js) ─────────────
+    // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': 'Đã phát hiện {type}',
     'popup.status.notADocTitle': 'Không phải Google Doc',
     'popup.status.notADocDetail': 'Hãy mở một Google Doc, Sheet hoặc Slide.',
@@ -70,7 +63,7 @@ export const dict = {
     'popup.notify.txtDownloading': 'Đang tải xuống "{filename}"',
     'popup.notify.txtFailed': 'Tải xuống thất bại: {message}',
 
-    // ─── Warning codes (shared/constants.js WARNINGS / WARNING_PREFIXES) ──
+    // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──
     'warning.single_sheet_only': 'Chỉ trang tính đầu tiên được đọc (gid=0) — các trang tính khác trong bảng tính này chưa được trích xuất.',
     'warning.tabnav_fallback': 'Tải trực tiếp thất bại nên tiện ích đã chuyển sang phương án cũ — tab của bạn có thể đã điều hướng tạm thời sang giao diện di động.',
     'warning.legacy_parser_fallback': 'Bộ phân tích chính đã thất bại nên đã dùng bộ phân tích dự phòng — một số định dạng có thể bị thiếu.',
@@ -84,7 +77,7 @@ export const dict = {
     'warning.low_confidence': 'Độ tin cậy trích xuất thấp — kết quả có thể chưa đầy đủ.',
     'warning.multi_tab_partial': 'Tài liệu nhiều tab: chỉ tab đầu tiên được trích xuất.',
 
-    // ─── Error codes (core/app-error.js AppError, spec v3 §5.3) ───────────
+    // ─── Error codes (AppError) ───────────────────────────────────────────
     'error.sheetNetworkFailed': 'Yêu cầu mạng thất bại khi tải bảng tính: {message}',
     'error.sheetSignInRequired': 'Bảng tính này yêu cầu đăng nhập — tiện ích không thể truy cập (bị chuyển hướng tới trang đăng nhập Google).',
     'error.sheetFetchFailed': 'Tải dữ liệu bảng tính thất bại (HTTP {status}).',

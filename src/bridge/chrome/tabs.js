@@ -1,7 +1,4 @@
-/**
- * tabs.js — tab lifecycle helpers (spec v3 §2/§4 P2). Moved from
- * background/service-worker.js's `ExtensionController`.
- */
+/** Tab lifecycle helpers. */
 import { TIMING } from '../../lib/const.js';
 
 /**
@@ -40,7 +37,7 @@ export function waitForTabLoad(tabId, timeoutMs = TIMING.TAB_LOAD_TIMEOUT_MS) {
 }
 
 /**
- * Navigate a tab to a new URL (used by the tabNav fallback pipeline).
+ * Navigate a tab. Used by the tabnav fallback.
  * @param {number} tabId
  * @param {string} url
  * @returns {Promise<void>}
@@ -61,11 +58,8 @@ export async function openNewDocTab() {
 }
 
 /**
- * Register a tab-removal listener. Kept as a thin wrapper (rather than
- * owning the cleanup logic itself) so this stays a pure platform primitive
- * — the actual cleanup spans both platform/net-rules.js and
- * extraction/pipeline-state.js, and lives in
- * extraction/pipeline-runner.js's `handleTabRemoved`.
+ * A thin wrapper only. The cleanup spans netrules and pipeline state, so it
+ * lives in run.js's `handleTabRemoved`.
  * @param {(tabId: number) => void} handler
  */
 export function onTabRemoved(handler) {

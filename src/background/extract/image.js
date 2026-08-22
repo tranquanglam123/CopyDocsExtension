@@ -78,7 +78,7 @@ export class ImageEmbedder {
         if (stats.budgetExceeded) stats.warnings.push(WARNINGS.IMAGE_BUDGET_EXCEEDED);
 
         console.log(
-            `[ImageEmbedder] ${stats.embedded}/${stats.totalFound} embedded ` +
+            `[extract/image] ${stats.embedded}/${stats.totalFound} embedded ` +
             `(not-bitmap: ${stats.notBitmap}, failed: ${stats.failed}, ` +
             `budgetExceeded: ${stats.budgetExceeded}), ${stats.totalBytes} bytes total.`
         );
@@ -179,7 +179,7 @@ export class ImageEmbedder {
             try {
                 res = await ImageEmbedder._withTimeout(fetchFn({ url: image.src, tabId }), timeoutMs);
             } catch (err) {
-                console.warn(`[ImageEmbedder] fetch threw for ${image.src}:`, err?.message || err);
+                console.warn(`[extract/image] fetch threw for ${image.src}:`, err?.message || err);
                 outcomes[i] = { action: 'fail' };
                 return;
             }
@@ -326,7 +326,7 @@ export async function embedImagesIntoResult(result, tabId) {
 
     const enabled = await isEmbedImagesEnabled();
     if (!enabled) {
-        console.log('[ImageEmbedder] Image embedding is OFF (popup toggle) — leaving image URLs as-is.');
+        console.log('[extract/image] Image embedding is OFF (popup toggle) — leaving image URLs as-is.');
         return result;
     }
 
@@ -339,7 +339,7 @@ export async function embedImagesIntoResult(result, tabId) {
         });
     } catch (err) {
         // Defense in depth only — embedImages is designed to never throw.
-        console.error('[ImageEmbedder] embedImages threw unexpectedly (non-fatal, keeping original bodyHtml):', err);
+        console.error('[extract/image] embedImages threw unexpectedly (non-fatal, keeping original bodyHtml):', err);
         return result;
     }
 
@@ -375,7 +375,7 @@ function _spliceBodyHtml(fullHtml, oldBodyHtml, newBodyHtml) {
     const idx = fullHtml.indexOf(oldBodyHtml);
     if (idx === -1) {
         console.warn(
-            '[ImageEmbedder] Could not locate bodyHtml inside the full wrapped document — ' +
+            '[extract/image] Could not locate bodyHtml inside the full wrapped document — ' +
             'html left without embedded images (bodyHtml/clipboard text still has them).'
         );
         return fullHtml;

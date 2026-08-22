@@ -1,30 +1,20 @@
 /**
- * net-rules.js — PolicyManager: DNR rule id allocation, JS block/restore,
- * and the stale-rule sweep (spec v3 §2/§4 P2). Moved from
- * background/service-worker.js.
- *
- * This is part of the machinery that stops a tab being left script-blocked
- * if the service worker dies mid-extraction (spec v3 §10 risk) — treated
- * as move-don't-touch: the method bodies below are unchanged, only their
- * constant sources now come from shared/constants.js.
+ * DNR rule id allocation, JS block and restore, stale-rule sweep. Part of
+ * what stops a tab being left script-blocked when the worker dies.
  */
 import { RULE_ID_BAND, SESSION_KEYS } from '../../lib/const.js';
 
 export class PolicyManager {
 
-    /** Session DNR rule id band reserved for this extension (fixes D7's
-     *  concern about ANY static block-all ruleset, and scoped for D4's
-     *  per-tab allocation). */
+    /** Session DNR rule id band reserved for this extension. */
     static RULE_ID_MIN = RULE_ID_BAND.MIN;
     static RULE_ID_MAX = RULE_ID_BAND.MAX;
 
     static ALLOC_KEY = SESSION_KEYS.RULE_ALLOC;
 
     /**
-     * Allocate the lowest free rule id in the 9000-9999 band for a tab
-     * (fixes D4 — `BASE_RULE_ID + (tabId % 1000)` collided for tab ids
-     * 1000 apart). Persisted immediately so a watchdog/startup sweep can
-     * recover it even if the service worker dies before the rule is added.
+     * Lowest free id in the band — `BASE + (tabId % 1000)` collided for tab
+     * ids 1000 apart. Persisted before the rule exists so a sweep finds it.
      * @param {number} tabId
      * @returns {Promise<number>} The allocated rule id.
      */
@@ -48,8 +38,7 @@ export class PolicyManager {
     }
 
     /**
-     * Release a previously-allocated rule id. Safe to call more than once
-     * or with an id that was never allocated (no-op).
+     * Safe to call twice, or with an id that was never allocated.
      * @param {number|null|undefined} ruleId
      * @returns {Promise<void>}
      */
@@ -76,19 +65,15 @@ export class PolicyManager {
     }
 
     /**
-     * Add a SESSION-scoped declarativeNetRequest rule that blocks all
-     * script resources on docs.google.com for the specified tab.
-     *
-     * Session rules (not dynamic rules) are required when using tabIds,
-     * because tab IDs are ephemeral and don't survive browser restarts.
+     * Blocks script resources on docs.google.com for one tab. Session rules,
+     * not dynamic: tabIds are ephemeral and do not survive a restart.
      *
      * @param {number} tabId
      * @param {number} ruleId
      * @returns {Promise<void>}
      */
     static async blockJavaScript(tabId, ruleId) {
-        // Remove any stale rule with this id first (defensive — should
-        // never happen since ids are freshly allocated).
+        // Ids are freshly allocated, so this should find nothing.
         await chrome.declarativeNetRequest.updateSessionRules({
             removeRuleIds: [ruleId],
         });
@@ -125,11 +110,9 @@ export class PolicyManager {
     }
 
     /**
-     * Remove EVERY session DNR rule whose id falls in the 9000-9999 band,
-     * regardless of what this service-worker instance thinks is allocated.
-     * Used by the startup sweep and the watchdog — the only two callers
-     * that must not trust in-memory or even storage.session state, since
-     * both exist specifically to recover from state that's gone stale.
+     * Every rule in the band, whatever this worker thinks is allocated. The
+     * sweep and the watchdog exist to recover from stale state, so they
+     * cannot trust it.
      * @returns {Promise<void>}
      */
     static async sweepAllRules() {

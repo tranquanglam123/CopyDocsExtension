@@ -1,11 +1,7 @@
 /**
- * csv-pipeline.js — Sheets extraction, fetching the `gviz` CSV export
- * directly from the service worker. Moved from background/service-worker.js's
- * `runSwFetchPipeline`. No tab navigation, no DNR rule (fixes D1 for Sheets;
- * see spec §3.2 T1 `swFetch`).
- *
- * P1 always reads `gid=0` — only the first sheet. This is surfaced via
- * `meta.warnings: [WARNINGS.SINGLE_SHEET_ONLY]` and must never be silent.
+ * Sheets extraction: the `gviz` CSV export, fetched from the service worker.
+ * No tab navigation, no DNR rule. Reads `gid=0` only, and says so through
+ * SINGLE_SHEET_ONLY — never silently.
  */
 import { DOC_TYPES, TRANSPORTS, WARNINGS } from '../../lib/const.js';
 import { parseCsv, csvToHtml } from '../../lib/csv.js';
@@ -38,7 +34,7 @@ export async function runSwFetchPipeline(tab, target, docId) {
             throw new AppError('error.sheetNetworkFailed', { message: err.message });
         }
 
-        // Login-wall via redirect (e.g. accounts.google.com/ServiceLogin).
+        // Login wall via redirect.
         if (response.url && /accounts\.google\.com|\/ServiceLogin/i.test(response.url)) {
             throw new AppError('error.sheetSignInRequired');
         }
@@ -50,22 +46,16 @@ export async function runSwFetchPipeline(tab, target, docId) {
             throw new AppError('error.sheetFetchFailed', { status: response.status });
         }
 
-        // Login-wall / access-wall via body content (gviz returns a
-        // small HTML/JS error payload, not a CSV, when access is denied).
-        //
-        // Gate this on the content type: a legitimate spreadsheet can
-        // legitimately contain the words "Sign in" (an attendance or
-        // sign-in sheet), and matching the wall pattern against CSV cell
-        // data would reject that user's own document. Only a non-CSV
-        // response can be an access wall.
+        // Denied access returns a small HTML/JS payload, not CSV. Gated on
+        // content type: a sign-in sheet legitimately contains "Sign in", so
+        // only a non-CSV response can be a wall.
         const isCsvResponse = /text\/csv|application\/csv/i.test(contentType);
         if (!isCsvResponse && /Sign in|You need access|Request access/i.test(bodyText)) {
             throw new AppError('error.sheetAccessWall');
         }
 
-        // The gviz endpoint answers errors with an HTML/JS payload rather
-        // than a non-2xx status. Feeding that to the CSV parser would
-        // produce convincing-looking garbage, so refuse it outright.
+        // gviz answers errors with HTML/JS and a 2xx. The CSV parser would
+        // turn that into convincing garbage.
         if (!isCsvResponse && /^\s*(<!DOCTYPE|<html|\)\]\}')/i.test(bodyText)) {
             throw new AppError('error.sheetNonCsvResponse');
         }
@@ -87,7 +77,7 @@ export async function runSwFetchPipeline(tab, target, docId) {
                 transport: TRANSPORTS.SW_FETCH,
                 docType: DOC_TYPES.SHEETS,
                 docId,
-                // P1 only ever reads gid=0 — never let this be silent.
+                // gid=0 only — never silent.
                 warnings: [WARNINGS.SINGLE_SHEET_ONLY],
             },
         };
@@ -96,8 +86,7 @@ export async function runSwFetchPipeline(tab, target, docId) {
 
         return result;
     } finally {
-        // No DNR rule and no tab was ever touched — clearing the
-        // pipeline slot is the only cleanup needed.
+        // No rule, no tab touched — the slot is the only cleanup.
         await PipelineState.clear();
     }
 }

@@ -105,7 +105,7 @@ export async function dispatchTransport(tab, target, docId) {
             return await runFetchHtmlPipeline(tab, target, docId);
         } catch (err) {
             console.warn(
-                '[pipeline-runner] Fetch transport failed on every tier ' +
+                '[extract/run] Fetch transport failed on every tier ' +
                 `(${err.message}) — falling back to tabNav.`
             );
 
@@ -164,7 +164,7 @@ export async function runWatchdog() {
 export async function startupSweep(reason) {
     await PolicyManager.sweepAllRules();
     await sessionRemove([SESSION_KEYS.RULE_ALLOC, SESSION_KEYS.PIPELINE]);
-    console.log(`[pipeline-runner] Startup sweep complete (${reason}).`);
+    console.log(`[extract/run] Startup sweep complete (${reason}).`);
 }
 
 /**

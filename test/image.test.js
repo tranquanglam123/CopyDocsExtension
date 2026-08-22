@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/image-embedder.js — pure parts only (spec §9).
+ * Unit tests for background/extract/image.js — pure parts only.
  *
  * `ImageEmbedder.embedImages` takes an injectable `fetchFn`
  * (`{url, tabId}) => Promise<{ok, base64, byteLength, contentType}>`) so

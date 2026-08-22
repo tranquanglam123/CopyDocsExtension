@@ -1,41 +1,18 @@
-/**
- * wall-detector.js — pure wall/login-wall detection (spec v3 §3.3 T2),
- * split out of extraction/http-transport.js so it has no Chrome-API / fetch
- * dependency and can sit in core/ (spec v3 §2). See http-transport.js's
- * file header for why the T1/T2 fetch-transport tiers exist at all; this
- * file only classifies a response body/URL as a wall or not.
- *
- * `detectWall` and `isImageContentType` are pure functions — no Chrome
- * APIs, no I/O — so they are unit tested directly under plain
- * `node --test` (see test/transport.test.js).
- */
+/** Classify a response body and URL as a login/access wall, or not. */
 
 /**
- * A response body under this size is in the size range of Google's own
- * boilerplate sign-in / access-wall / help pages (a few KB), never a real
- * `/mobilebasic` export — that runs from tens of KB to several hundred KB
- * even for a short document, because of Google's CSS and markup overhead
- * (the restricted doc measured for this fix was 784,354 bytes). Gating the
- * body-text phrase match on size means a genuine document that happens to
- * use the words "request access" in its own prose (e.g. a policies doc) is
- * not misdetected as a wall — see test/transport.test.js and the T5 note
- * in the fix report.
+ * Google's boilerplate wall pages are a few KB; a real `/mobilebasic` export
+ * is tens to hundreds (the doc measured here was 784,354 bytes). Gating the
+ * phrase match on size stops a policies doc saying "request access" in its
+ * own prose from being flagged.
  */
 export const SMALL_BODY_WALL_THRESHOLD = 20000;
 
 /**
- * Detect whether a fetched response is actually a login/access wall rather
- * than the document itself. Pure function — no Chrome APIs, no I/O.
- *
- * Catches:
- *  - a redirect to Google's sign-in flow (`accounts.google.com`, `/ServiceLogin`)
- *  - a redirect to `support.google.com/accounts/answer/32050` — the exact
- *    "clear cache and cookies" page the broken tabNav path was redirecting
- *    to, and the regression http-transport.js's T1/T2 tiers exist to fix
- *  - a body whose `<title>` matches that same cookies-help page, for when
- *    a transport can't surface `finalUrl` (or Google changes the URL)
- *  - a small body containing "You need access" / "Request access" —
- *    Google's access-wall boilerplate, size-gated per the note above
+ * Catches a redirect to the sign-in flow; a redirect to the "clear cache and
+ * cookies" page tabnav trips; a body whose `<title>` is that page, for a
+ * transport with no `finalUrl`; and a small body saying "You need access" or
+ * "Request access".
  *
  * @param {string} html      Response body text (may be large).
  * @param {string} finalUrl  The URL the response actually landed on
@@ -49,7 +26,7 @@ export function detectWall(html, finalUrl) {
         return 'login_redirect';
     }
 
-    // The exact production failure http-transport.js's tiers exist to fix.
+    // The exact failure the fetch tiers exist to avoid.
     if (/support\.google\.com\/accounts\/answer\/32050/i.test(url)) {
         return 'cookies_help_redirect';
     }

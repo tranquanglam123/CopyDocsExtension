@@ -1,17 +1,9 @@
 /**
- * HtmlSanitize — Sanitisation rules applied to fetched HTML BEFORE anything
- * else reads it (spec §4.2 step 5). Kept in its own module so the rule set
- * is auditable in one place, separate from parsing/extraction logic.
+ * Applied to fetched HTML before anything else reads it, kept in one place
+ * so the rule set is auditable.
  *
- * Requires a DOM (`Document`/`Element` with `querySelectorAll`); this is not
- * unit-testable under plain `node --test` and is exercised via the offscreen
- * parser in a real browser only (see test/MANUAL-CHECKLIST.md).
- *
- * Defense in depth: the offscreen parser also loads content into an
- * `<iframe sandbox="allow-same-origin">` with NO `allow-scripts`, so even if
- * a `<script>` tag or an inline event handler survived sanitisation, the
- * browser would refuse to execute it. This module removes them anyway so
- * the *extracted* HTML that gets copied/downloaded is clean too.
+ * The sandbox iframe already refuses to execute scripts; this runs anyway so
+ * the HTML that gets copied or downloaded is clean too.
  */
 export class HtmlSanitize {
 
@@ -52,8 +44,7 @@ export class HtmlSanitize {
     static _stripEventHandlerAttributes(root) {
         const all = root.querySelectorAll('*');
         for (const el of all) {
-            // Snapshot first — mutating `attributes` (a live NamedNodeMap) while
-            // iterating it directly skips entries.
+            // `attributes` is live: mutating while iterating skips entries.
             const attrNames = [...el.attributes].map((a) => a.name);
             for (const name of attrNames) {
                 if (name.toLowerCase().startsWith('on')) {

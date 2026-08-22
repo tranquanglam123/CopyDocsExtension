@@ -1,16 +1,9 @@
 /**
- * StyleDecision — Pure logic for turning a resolved (computed) style into
- * the semantic tag that best represents it.
+ * A resolved style to the semantic tag that represents it.
  *
- * This exists as a standalone module (no DOM) so the "which tag does this
- * styling mean" decision can be unit-tested under plain `node --test`,
- * independent of a browser/DOM environment.
- *
- * Callers (the offscreen parser) MUST feed it values read via
- * `getComputedStyle(node)` — never `node.style` (inline only). Google's
- * `/mobilebasic` output carries bold/italic/underline as CSS *classes*
- * defined in a `<style>` block (e.g. `.c3{font-weight:700}`), so reading
- * only inline style silently drops almost all character formatting (D2).
+ * Callers must pass `getComputedStyle` values, never `node.style`:
+ * mobilebasic carries bold/italic/underline as classes, so inline style
+ * alone drops almost all character formatting.
  */
 export class StyleDecision {
 
@@ -49,7 +42,7 @@ export class StyleDecision {
     static isItalic(fontStyle) {
         if (!fontStyle) return false;
         const raw = String(fontStyle).trim().toLowerCase();
-        // 'oblique 14deg' is valid CSS — match the leading keyword only.
+        // 'oblique 14deg' is valid CSS, so match the leading keyword.
         const keyword = raw.split(/\s+/)[0];
         return StyleDecision.ITALIC_VALUES.has(keyword);
     }
@@ -65,9 +58,8 @@ export class StyleDecision {
     }
 
     /**
-     * Compute all three formatting flags at once. Use this when the caller
-     * wants to preserve *combined* formatting (e.g. bold AND italic) rather
-     * than collapsing to a single tag.
+     * All three flags at once, for a caller preserving combined formatting
+     * rather than collapsing to one tag.
      * @param {{fontWeight?: string|number, fontStyle?: string, textDecorationLine?: string, textDecoration?: string}} style
      * @returns {{bold: boolean, italic: boolean, underline: boolean}}
      */
@@ -75,15 +67,14 @@ export class StyleDecision {
         return {
             bold: StyleDecision.isBold(fontWeight),
             italic: StyleDecision.isItalic(fontStyle),
-            // Some engines only expose the shorthand `textDecoration`; accept either.
+            // Some engines expose only the `textDecoration` shorthand.
             underline: StyleDecision.isUnderline(textDecorationLine ?? textDecoration),
         };
     }
 
     /**
-     * Collapse a resolved style to the single best semantic tag.
-     * Priority when multiple flags are true: bold > italic > underline
-     * (matches the pre-existing single-wrap behaviour of the legacy scanner).
+     * One tag only. Priority when several flags are true: bold, italic,
+     * underline.
      * @param {{fontWeight?: string|number, fontStyle?: string, textDecorationLine?: string, textDecoration?: string}} style
      * @returns {'b'|'i'|'u'|null}
      */

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { StyleFill } from '../src/lib/style.js';
 
-// This is the spec v2.1 §9 coverage: StyleFill is pure logic (plain
+// This is the the rules coverage: StyleFill is pure logic (plain
 // strings/objects, no DOM), so it is fully testable under `node --test`
 // even though the thing it exists to get right — a real CSS cascade
 // resolved via getComputedStyle inside a sandboxed iframe — cannot run
@@ -19,8 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'mobilebasic-table.html');
 const fixtureHtml = readFileSync(FIXTURE_PATH, 'utf8');
 
-// The real header-cell style quoted verbatim in docs/SPEC-v2.1-format-fidelity.md
-// §1, with the spec's elided "…" filled in (matching border-right/-bottom/-left
+// The real header-cell style quoted verbatim in 
+// The real header-cell style, with its elided "…" filled in (matching border-right/-bottom/-left
 // longhands — see the comment in the fixture next to this cell). Kept here as a
 // literal so parseStyleString/filterDenied/buildElementStyle are exercised
 // against the *exact* production string, not an invented one.
@@ -32,7 +32,7 @@ const HEADER_CELL_STYLE =
     'width:30.6pt;padding:0pt 5.4pt 0pt 5.4pt;vertical-align:top';
 
 describe('fixture sanity', () => {
-    test('the real header-cell style from spec §1 is actually present in the fixture', () => {
+    test('the real header-cell style from the rules is actually present in the fixture', () => {
         assert.ok(
             fixtureHtml.includes(HEADER_CELL_STYLE),
             'test/fixtures/mobilebasic-table.html drifted from the literal these tests assume'
@@ -41,7 +41,7 @@ describe('fixture sanity', () => {
 });
 
 describe('StyleFill.parseStyleString / serializeStyle', () => {
-    test('parses the real header-cell style (spec §1) into every declared longhand', () => {
+    test('parses the real header-cell style into every declared longhand', () => {
         const parsed = StyleFill.parseStyleString(HEADER_CELL_STYLE);
         assert.equal(parsed['background-color'], '#c00000');
         assert.equal(parsed['border-top-width'], '1pt');
@@ -94,7 +94,7 @@ describe('StyleFill.parseStyleString / serializeStyle', () => {
     });
 });
 
-describe('StyleFill.filterDenied — blocklist, not whitelist (spec §3.1)', () => {
+describe('StyleFill.filterDenied — blocklist, not whitelist', () => {
     test('every STYLE_DENY property is removed', () => {
         const authored = {
             position: 'absolute',
@@ -137,7 +137,7 @@ describe('StyleFill.filterDenied — blocklist, not whitelist (spec §3.1)', () 
     });
 });
 
-describe('StyleFill.isMeaninglessDefault (spec §3.3 last paragraph)', () => {
+describe('StyleFill.isMeaninglessDefault', () => {
     test('rgba(0, 0, 0, 0) background-color is meaningless', () => {
         assert.equal(StyleFill.isMeaninglessDefault('background-color', 'rgba(0, 0, 0, 0)'), true);
         assert.equal(StyleFill.isMeaninglessDefault('background-color', 'transparent'), true);
@@ -184,7 +184,7 @@ describe('StyleFill.isMeaninglessDefault (spec §3.3 last paragraph)', () => {
     });
 });
 
-describe('StyleFill.resolveAppearanceValue — parent-diff decision (spec §3.2 row 2)', () => {
+describe('StyleFill.resolveAppearanceValue — parent-diff decision', () => {
     test('a computed value equal to the parent\'s is dropped (inherited, not restated)', () => {
         assert.equal(
             StyleFill.resolveAppearanceValue({ property: 'font-family', own: '"Calibri"', parent: '"Calibri"' }),
@@ -248,7 +248,7 @@ describe('StyleFill.APPEARANCE_PROPERTIES — never a shorthand (F3)', () => {
     });
 });
 
-describe('StyleFill.LAYOUT_PROPERTIES — geometry, authored-only (spec §3.2 row 1)', () => {
+describe('StyleFill.LAYOUT_PROPERTIES — geometry, authored-only', () => {
     test('covers width/height/margin*/padding*/text-indent', () => {
         for (const prop of ['width', 'height', 'margin-left', 'margin-top', 'padding-left', 'padding-top', 'text-indent']) {
             assert.ok(StyleFill.LAYOUT_PROPERTIES.has(prop), `${prop} missing from LAYOUT_PROPERTIES`);
@@ -262,7 +262,7 @@ describe('StyleFill.LAYOUT_PROPERTIES — geometry, authored-only (spec §3.2 ro
     });
 });
 
-describe('StyleFill.buildElementStyle — orchestration (spec §3.2)', () => {
+describe('StyleFill.buildElementStyle — orchestration', () => {
     test('denied properties are removed from the authored style', () => {
         const result = StyleFill.buildElementStyle({
             authoredStyleText: 'display:inline-block;position:absolute;color:#000000',
@@ -284,7 +284,7 @@ describe('StyleFill.buildElementStyle — orchestration (spec §3.2)', () => {
         assert.equal(result.padding, '0pt 5.4pt 0pt 5.4pt');
     });
 
-    test('margin-left is never filled from computed style when absent from the authored text (spec §3.2 row 1)', () => {
+    test('margin-left is never filled from computed style when absent from the authored text', () => {
         const result = StyleFill.buildElementStyle({
             authoredStyleText: 'color:#000000',
             computed: { 'margin-left': '36pt' },
@@ -363,7 +363,7 @@ describe('StyleFill.buildElementStyle — orchestration (spec §3.2)', () => {
         assert.equal(result.padding, '0pt 5.4pt 0pt 5.4pt');
     });
 
-    test('the real header-cell style (spec §1) survives buildElementStyle unchanged when there is no computed input', () => {
+    test('the real header-cell style survives buildElementStyle unchanged when there is no computed input', () => {
         const result = StyleFill.buildElementStyle({ authoredStyleText: HEADER_CELL_STYLE });
         assert.equal(result['background-color'], '#c00000');
         assert.equal(result['border-top-color'], '#ee822f');

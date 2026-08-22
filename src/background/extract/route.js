@@ -1,29 +1,18 @@
 /**
- * targets.js — doc-type → extraction-endpoint mapping (spec v3 §2/§4 P2).
- * Moved out of core/document-url.js's `UrlTransformer.toExtractionTarget`
- * so document-url.js stays pure URL parsing (`identify`/`getDocId`/
- * `getTypeLabel`); this file encodes WHICH endpoint/transport each doc type
- * extracts through, which is extraction-orchestration knowledge, not URL
- * parsing.
+ * Doc type to extraction endpoint. Kept out of lib/url.js, which stays pure
+ * URL parsing; which endpoint to use is orchestration knowledge.
  */
 import { DOC_TYPES } from '../../lib/const.js';
 import { UrlTransformer } from '../../lib/url.js';
 
 /**
- * Build the extraction target for a Google Workspace URL (fixes D1 —
- * `/mobilebasic` does not exist for Sheets or Slides, only for Docs).
+ * `/mobilebasic` exists for Docs only, so each type routes differently:
  *
- * - docs   → `/document/d/{id}/mobilebasic`, parsed as HTML, fetched
- *            directly (`fetch` — T1 `swFetch` then T2 `csFetch`, spec
- *            §3.2, pulled forward from P3). No tab navigation, no DNR
- *            rule. `extraction/pipeline-runner.js` falls back to the
- *            legacy `tabNav` pipeline only if every fetch tier fails.
- * - sheets → the `gviz` CSV export endpoint, parsed as CSV, fetched
- *            directly from the service worker (`swFetch` — no tab
- *            navigation, no DNR rule). P1 reads `gid=0` only; the
- *            caller must surface `warnings: ['single_sheet_only']`.
- * - slides → no working server-rendered path exists yet (see spec
- *            §3.3) — returns `null`, unsupported in P1.
+ * - docs   → `/mobilebasic` as HTML, fetched. run.js falls back to tabnav
+ *            only if every tier fails.
+ * - sheets → the `gviz` CSV export, fetched from the worker. `gid=0` only;
+ *            the caller must surface SINGLE_SHEET_ONLY.
+ * - slides → `null`. No server-rendered path exists.
  *
  * @param {string} url
  * @returns {{ url: string, parser: 'html'|'csv', mode: 'fetch'|'swFetch' } | null}
@@ -49,7 +38,7 @@ export function toExtractionTarget(url) {
                 mode: 'swFetch',
             };
         case DOC_TYPES.SLIDES:
-            // Unsupported in P1 — no reliable server-rendered path exists.
+            // No reliable server-rendered path exists.
             return null;
         default:
             return null;

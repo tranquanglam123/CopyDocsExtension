@@ -93,10 +93,10 @@
       <span id="warnings-text" class="warnings-text"></span>
     </section>
 
-    <!-- Options — "Embed images" toggle (spec §4.4). Default ON: whether
+    <!-- Options — "Embed images" toggle. Default ON: whether
          Google Docs accepts data: URI images on paste is unverified
-         (spec §8), so this checkbox is the escape hatch. Persisted in
-         chrome.storage.local, read by background/service-worker.js
+         unverified, so this checkbox is the escape hatch. Persisted in
+         chrome.storage.local, read by background/main.js
          (ImageEmbedSettings) before every embed pass. -->
     <section id="options-row" class="options-row">
       <label class="option-toggle" for="chk-embed-images">
@@ -171,7 +171,7 @@
 
     </section>
 
-    <!-- .docx image caveat (spec §7) — the DOCX writer is deferred to v2.2
+    <!-- .docx image caveat — the DOCX writer is deferred to v2.2
          and currently ignores <img> entirely, so images embedded above only
          reach the clipboard (Copy / New Doc) output, never the .docx
          download. Stated up front rather than left for the user to
@@ -185,9 +185,9 @@
       <span id="notification-text"></span>
     </div>
 
-    <!-- Footer — language selector (spec v3 §5.5) next to the version.
+    <!-- Footer — language selector next to the version.
          Switching re-renders the popup immediately, see
-         ui/popup-controller.js's handleLanguageChange(). Native language
+         popup/controller.js's handleLanguageChange(). Native language
          names in the options, not translated ones — the usual convention
          for a language picker, so a user who picked the wrong language by
          accident can still recognize their own. -->

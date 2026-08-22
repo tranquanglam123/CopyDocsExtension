@@ -1,11 +1,6 @@
 /**
- * en.js — English strings (spec v3 §5). The reference dictionary: a test
- * (test/i18n.test.js) asserts vi.js has exactly the same key set, so a new
- * string cannot silently ship untranslated.
- *
- * Plain data only — no imports, no chrome.* (this file lives under
- * src/shared/, spec v3 §8) — loaded by src/shared/i18n.js via a dynamic
- * `import()` so it works identically in the popup and the service worker.
+ * The reference dictionary. test/i18n.test.js asserts vi.js carries exactly
+ * the same key set, so a new string cannot ship untranslated.
  */
 export const dict = {
     // ─── Static popup chrome (filled via I18n.apply(), data-i18n*) ────────
@@ -31,7 +26,7 @@ export const dict = {
     'popup.docxNote': "Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.",
     'popup.footer.languageLabel': 'Language',
 
-    // ─── Dynamic status card (I18n.t() from ui/popup-view.js) ─────────────
+    // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': '{type} detected',
     'popup.status.notADocTitle': 'Not a Google Doc',
     'popup.status.notADocDetail': 'Navigate to a Google Doc, Sheet, or Slide.',
@@ -66,7 +61,7 @@ export const dict = {
     'popup.notify.txtDownloading': 'Downloading "{filename}"',
     'popup.notify.txtFailed': 'Download failed: {message}',
 
-    // ─── Warning codes (shared/constants.js WARNINGS / WARNING_PREFIXES) ──
+    // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──
     'warning.single_sheet_only': 'Only the first sheet was read (gid=0) — other sheets in this spreadsheet were not extracted.',
     'warning.tabnav_fallback': 'Direct fetch failed, so the extension fell back to the legacy method — your tab may have briefly navigated to the mobile view.',
     'warning.legacy_parser_fallback': 'The primary parser failed and a fallback parser was used — some formatting may be missing.',
@@ -80,7 +75,7 @@ export const dict = {
     'warning.low_confidence': 'Low-confidence extraction — the result may be incomplete.',
     'warning.multi_tab_partial': 'Multi-tab doc: only the first tab was extracted.',
 
-    // ─── Error codes (core/app-error.js AppError, spec v3 §5.3) ───────────
+    // ─── Error codes (AppError) ───────────────────────────────────────────
     'error.sheetNetworkFailed': 'Network request failed while fetching the sheet: {message}',
     'error.sheetSignInRequired': 'This spreadsheet requires sign-in — the extension could not access it (redirected to a Google login page).',
     'error.sheetFetchFailed': 'Failed to fetch sheet data (HTTP {status}).',

@@ -1,12 +1,6 @@
 /**
- * popup.js — bootstrap for the CopyDocExt popup.
- *
- * IMPORTANT: This is an ES module (type="module" in popup.html).
- *
- * This file does nothing but wire DOM event listeners to controller
- * handlers and kick off init — every DOM write lives in ui/popup-view.js,
- * every flow/messaging decision lives in ui/popup-controller.js (spec v3
- * §4 P2).
+ * Popup bootstrap: wire listeners, kick off init. An ES module, per
+ * popup.html's `type="module"`.
  */
 
 import * as view from './view.js';
@@ -23,9 +17,7 @@ view.elements.chkEmbedImages.addEventListener('change', controller.handleEmbedIm
 view.elements.langSelect.addEventListener('change', controller.handleLanguageChange);
 
 // ── Boot ─────────────────────────────────────────────────────────
-// i18n loads first (spec v3 §5) so nothing renders untranslated even for
-// an instant — everything downstream of it (labels, statuses, errors)
-// depends on I18n already having a dictionary loaded.
+// First, so nothing renders untranslated even for an instant.
 
 await controller.initI18n();
 controller.initEmbedImagesToggle();

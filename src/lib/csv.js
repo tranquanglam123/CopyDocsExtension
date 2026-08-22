@@ -1,28 +1,14 @@
 /**
- * csv-to-html — Pure, dependency-free RFC-4180 CSV parser and HTML table
- * renderer.
- *
- * Used by the service worker (Sheets `swFetch` pipeline, see
- * background/service-worker.js) to turn a `gviz/tq?tqx=out:csv` response
- * into the same `{ title, text, html, bodyHtml, charCount }` shape the
- * rest of the extension already expects from the Docs extraction path.
- *
- * Zero DOM dependency — this file must run unmodified under both the
- * Chrome service worker (no DOM) and `node --test` (no Chrome APIs).
+ * RFC-4180 CSV parser and HTML table renderer. Turns a `gviz` CSV response
+ * into the same result shape the Docs path produces.
  */
 
 // ─── CSV parsing (RFC 4180) ─────────────────────────────────────────────────
 
 /**
- * Parse RFC-4180 CSV text into a 2-D array of strings.
- *
- * Handles:
- *  - quoted fields, including fields containing commas and newlines
- *  - `""` as an escaped literal quote inside a quoted field
- *  - `\r\n`, `\n`, and lone `\r` line endings
- *  - a missing trailing newline (last row is still captured)
- *  - ragged rows (rows are returned with whatever column count they had —
- *    no padding is applied)
+ * Handles quoted fields with commas and newlines, `""` as an escaped quote,
+ * all three line endings, a missing trailing newline, and ragged rows
+ * (returned unpadded).
  *
  * @param {string} text  Raw CSV text.
  * @returns {string[][]} Array of rows, each an array of cell strings.
@@ -43,7 +29,7 @@ export function parseCsv(text) {
         if (inQuotes) {
             if (char === '"') {
                 if (text[i + 1] === '"') {
-                    // Escaped quote ("") inside a quoted field → literal "
+                    // "" inside a quoted field is a literal "
                     field += '"';
                     i += 2;
                     continue;
@@ -53,8 +39,7 @@ export function parseCsv(text) {
                 i += 1;
                 continue;
             }
-            // Any other character (including raw newlines) is literal
-            // while inside a quoted field.
+            // Inside quotes, everything else is literal, newlines included.
             field += char;
             i += 1;
             continue;
@@ -96,10 +81,8 @@ export function parseCsv(text) {
         i += 1;
     }
 
-    // Flush a trailing field/row that wasn't terminated by a line break
-    // (i.e. the file doesn't end in a newline). If the file ended exactly
-    // on a line break, field==='' and row is empty here, so nothing extra
-    // is emitted.
+    // Flush a row with no terminating line break. A file that ended on one
+    // leaves field and row empty here, so nothing extra is emitted.
     if (field !== '' || row.length > 0) {
         row.push(field);
         rows.push(row);
@@ -124,9 +107,8 @@ function escapeHtml(str) {
 }
 
 /**
- * A cell counts as "numeric" if, once trimmed, it parses as a finite number.
- * Empty cells are NOT numeric (an empty header cell shouldn't disqualify a
- * header row).
+ * Empty cells are not numeric — an empty header cell must not disqualify a
+ * header row.
  * @param {string} cell
  * @returns {boolean}
  */
@@ -137,11 +119,9 @@ function isNumericCell(cell) {
 }
 
 /**
- * Render parsed CSV rows to an HTML `<table>` plus flattened plain text.
- *
- * The first row becomes a `<thead>`/`<th>` row only if every one of its
- * cells is non-numeric (spec §4.5) — this keeps a numeric data row from
- * being mistaken for a header.
+ * Rows to an HTML `<table>` plus flattened text. The first row is a header
+ * only if every cell is non-numeric, so a numeric data row is not mistaken
+ * for one.
  *
  * @param {string[][]} rows  Output of {@link parseCsv}.
  * @returns {{ bodyHtml: string, text: string, charCount: number }}

@@ -1,7 +1,6 @@
 /**
- * MiniZip — Minimal ZIP file creator using only browser APIs.
- * Produces valid ZIP files without any external dependencies.
- * Supports STORE (no compression) which is fine for XML/text content.
+ * Minimal ZIP writer, browser APIs only. STORE, no compression — fine for
+ * the XML a .docx is made of.
  */
 export class MiniZip {
 

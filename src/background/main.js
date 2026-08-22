@@ -47,7 +47,7 @@ async function handleMessage(message, sender, sendResponse) {
 
             case MSG.CONTENT_READY:
                 // tabNav path only — content script ships raw HTML for the
-                // offscreen parser (extraction/tabnav-pipeline.js).
+                // offscreen parser (background/extract/via-tabnav.js).
                 await handleContentReady(message.data, sender?.tab?.id);
                 sendResponse({ success: true });
                 break;

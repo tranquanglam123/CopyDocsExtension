@@ -1,10 +1,10 @@
 /**
- * Unit tests for shared/i18n.js and the locale dictionaries (spec v3 §5/§8).
+ * Unit tests for lib/i18n and the locale dictionaries.
  *
- * These must not require Chrome APIs (spec §11) — I18n itself never calls
- * chrome.* (see shared/i18n.js's file header), so `I18n.init()`/`setLanguage()`
+ * These must not require Chrome APIs — I18n itself never calls
+ * chrome.* (see lib/i18n's file header), so `I18n.init()`/`setLanguage()`
  * work here exactly as they do in the popup, just without the
- * platform/language.js dependency injection (persistence/detection are
+ * bridge/prefs.js dependency injection (persistence/detection are
  * optional — omitting them just leaves the in-memory default).
  *
  *   node --test test/
@@ -39,7 +39,7 @@ describe('locale dictionaries', () => {
         }
     });
 
-    test('every warning code in shared/constants.js (WARNINGS) has a message key in both locales', () => {
+    test('every warning code in lib/const.js (WARNINGS) has a message key in both locales', () => {
         for (const code of Object.values(WARNINGS)) {
             const key = `warning.${code}`;
             assert.ok(key in en, `en.js is missing "${key}"`);
@@ -47,7 +47,7 @@ describe('locale dictionaries', () => {
         }
     });
 
-    test('every warning code in shared/constants.js (WARNING_PREFIXES) has a message key in both locales', () => {
+    test('every warning code in lib/const.js (WARNING_PREFIXES) has a message key in both locales', () => {
         for (const code of Object.values(WARNING_PREFIXES)) {
             const key = `warning.${code}`;
             assert.ok(key in en, `en.js is missing "${key}"`);

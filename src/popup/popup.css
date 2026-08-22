@@ -408,7 +408,7 @@ body {
   padding-top: 2px;
 }
 
-/* Compact language selector (spec v3 §5.5), same dark theme as the rest. */
+/* Compact language selector, same dark theme as the rest. */
 .lang-select {
   background: var(--bg-card);
   color: var(--text-secondary);

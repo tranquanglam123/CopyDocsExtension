@@ -1,12 +1,12 @@
 /**
- * fetch-pipeline.js — Docs extraction via the fetch transport (spec §3.2,
- * T1 `swFetch` then T2 `csFetch`). Moved from background/service-worker.js's
+ * Docs extraction via the fetch transport (
+ * T1 `swFetch` then T2 `csFetch`). Moved from background/main.js's
  * `runFetchHtmlPipeline`.
  *
  * No DNR rule, no tab navigation — the user's tab is never touched.
  * If both fetch tiers fail, this throws and the caller
- * (`pipeline-runner.js`'s `dispatchTransport`) falls back to
- * `tabnav-pipeline.js`'s `runTabNavPipeline`. See http-transport.js's file
+ * (run.js's `dispatchTransport`) falls back to
+ * via-tabnav.js's `runTabNavPipeline`. See http.js's file
  * header for why this exists instead of tabNav-only.
  */
 import { DOC_TYPES } from '../../lib/const.js';
@@ -58,7 +58,7 @@ export async function runFetchHtmlPipeline(tab, target, docId) {
     } finally {
         // No DNR rule and no tab was ever touched — clearing the
         // pipeline slot is the only cleanup needed (mirrors
-        // csv-pipeline.js's runSwFetchPipeline).
+        // via-csv.js's runSwFetchPipeline).
         await PipelineState.clear();
     }
 }

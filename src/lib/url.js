@@ -1,6 +1,4 @@
-/**
- * UrlTransformer — Utility class for Google Docs/Sheets/Slides URL manipulation.
- */
+/** Google Docs/Sheets/Slides URL parsing. */
 export class UrlTransformer {
 
   /** Regex patterns for Google Workspace document URLs */

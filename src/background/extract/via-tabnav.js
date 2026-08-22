@@ -1,24 +1,13 @@
 /**
- * tabnav-pipeline.js — Docs extraction, legacy v1 behaviour (DNR-block JS
- * on the tab, navigate to /mobilebasic, content script scrapes, restore
- * JS). Moved from background/service-worker.js's `runTabNavPipeline` and
- * `parseContentPayload` (spec v3 P2/P3).
+ * Docs extraction the legacy way: block JS on the tab, navigate to
+ * /mobilebasic, let the content script scrape, restore JS.
  *
- * LAST-RESORT FALLBACK ONLY as of the T1/T2 fetch-transport fix: this is
- * the pipeline that redirects to support.google.com/accounts/answer/32050
- * in the real browser (see http-transport.js's file header), because
- * blocking scripts breaks Google's own cookie bootstrap.
- * `pipeline-runner.js`'s `dispatchTransport` only reaches this when
- * `fetch-pipeline.js`'s `runFetchHtmlPipeline` (T1 swFetch / T2 csFetch)
- * has already failed on every tier. Kept intact, not deleted — persisted
- * pipeline state + allocator rule ids (fixes D3/D4) unchanged.
+ * Last resort only. This is the path that redirects to the "clear cache and
+ * cookies" page, because blocking scripts breaks Google's cookie bootstrap.
+ * run.js reaches it only after every fetch tier has failed.
  *
- * spec v3 P3: the content script's in-page fallback parser (DOMScanner) has
- * been deleted. `handleContentReady` below used to retry via a message
- * round trip back to the content script's `{action:'extract'}` handler
- * when the offscreen parse failed; that retry is gone, and a failed
- * offscreen parse is now fatal to this extraction (there is nothing left
- * to fall back to).
+ * There is no in-page fallback parser any more, so a failed offscreen parse
+ * is fatal to this extraction.
  */
 import { DOC_TYPES, TRANSPORTS } from '../../lib/const.js';
 import { AppError } from '../../lib/error.js';
@@ -30,11 +19,9 @@ import { PipelineState } from './state.js';
 import { embedImagesIntoResult } from './image.js';
 
 /**
- * Pending extraction resolver.
- * When the content script sends 'contentReady', we resolve this promise
- * so runTabNavPipeline() can continue. This is a FAST PATH only — the
- * persisted PipelineState + watchdog alarm are the actual guarantee
- * that a tab never stays script-blocked (D3).
+ * Resolved when the content script sends 'contentReady'. A fast path only —
+ * the persisted state and the watchdog are what actually guarantee a tab
+ * never stays script-blocked.
  * @type {{ resolve: Function, reject: Function } | null}
  */
 let _pendingExtraction = null;
@@ -49,9 +36,8 @@ export async function runTabNavPipeline(tab, target, docId) {
     const tabId = tab.id;
     const ruleId = await PolicyManager.allocateRuleId(tabId);
 
-    // Written BEFORE the DNR rule is added — if the SW dies right
-    // after this line, the watchdog/startup sweep still knows a rule
-    // may exist for this tab and will remove it.
+    // Written before the DNR rule exists, so a service worker killed on the
+    // next line still leaves the sweep a breadcrumb.
     await PipelineState.write({
         phase: 'blocking',
         tabId,
@@ -65,8 +51,7 @@ export async function runTabNavPipeline(tab, target, docId) {
     try {
         await PipelineState.write({ phase: 'navigating' });
 
-        // Create a promise that the content script will resolve when
-        // it sends 'contentReady' after auto-injection.
+        // Resolved by 'contentReady' after auto-injection.
         const contentPromise = new Promise((resolve, reject) => {
             _pendingExtraction = { resolve, reject };
 
@@ -79,8 +64,7 @@ export async function runTabNavPipeline(tab, target, docId) {
             }, 20000);
         });
 
-        // Navigate the tab to mobilebasic.
-        // (This will likely close the popup — that's OK, results go to session storage)
+        // Likely closes the popup; results go to session storage.
         await navigateTab(tabId, target.url);
 
         // Wait for the page to finish loading
@@ -88,9 +72,8 @@ export async function runTabNavPipeline(tab, target, docId) {
 
         await PipelineState.write({ phase: 'extracting' });
 
-        // Wait for content script to send extracted data. The content
-        // script is auto-injected by manifest content_scripts and runs
-        // its own readiness detector (spec §4.4) before scanning.
+        // The content script is auto-injected and runs its own readiness
+        // detector before sending.
         const extractedData = await contentPromise;
 
         extractedData.meta = {
@@ -100,15 +83,14 @@ export async function runTabNavPipeline(tab, target, docId) {
             docId,
         };
 
-        // Store the final result (already done in handleContentReady, but ensure)
+        // handleContentReady already stored this; make sure.
         await setExtractionComplete(extractedData);
 
         return extractedData;
 
     } finally {
-        // Always restore JavaScript and release the rule id — this
-        // `finally` is now a FAST PATH, not the only guarantee (D3).
-        // The watchdog alarm and the startup sweep back it up.
+        // A fast path, not the only guarantee — the watchdog and the
+        // startup sweep back it up.
         await PolicyManager.restoreJavaScript(ruleId);
         await PolicyManager.releaseRuleId(ruleId);
         await PipelineState.clear();
@@ -116,12 +98,8 @@ export async function runTabNavPipeline(tab, target, docId) {
 }
 
 /**
- * Turn a content-script payload into the extraction result contract.
- *
- * The content script ships raw HTML and lets the offscreen parser do the
- * work, because only a real CSS cascade can resolve Google's class-based
- * formatting (D2). Per spec v3 P3, there is no in-page fallback parser any
- * more — an offscreen-parser failure is fatal to this extraction.
+ * The content script ships raw HTML because only a real CSS cascade resolves
+ * Google's class-based formatting. A parser failure is fatal here.
  *
  * @param {object} payload   { rawHtml, title, url, docType }
  * @param {number|undefined} tabId  Sending tab, used for image embedding's
@@ -141,13 +119,13 @@ export async function handleContentReady(payload, tabId) {
         };
         result = await embedImagesIntoResult(result, tabId);
     } catch (err) {
-        console.error('[tabnav-pipeline] Offscreen parse failed — no fallback parser is available:', err);
+        console.error('[extract/via-tabnav] Offscreen parse failed — no fallback parser is available:', err);
         throw new AppError('error.offscreenParseFailed', { message: err.message });
     }
 
     await setExtractionComplete(result);
 
-    // If runTabNavPipeline() is waiting for this, resolve it.
+    // Release the pipeline if it is waiting.
     if (_pendingExtraction) {
         _pendingExtraction.resolve(result);
         _pendingExtraction = null;

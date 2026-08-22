@@ -1,16 +1,7 @@
 /**
- * ContainerScore — Pure structural scoring for "which element on the page is
- * the actual document body" (spec §4.3).
- *
- * The fast path (known selectors like `div.doc-content`, `#contents`,
- * `[role="main"]`) lives in the offscreen parser, since it's a plain DOM
- * query with nothing to unit-test. This module holds the *fallback* scoring
- * function — used when the fast path is unavailable or yields a container
- * that looks wrong — kept dependency-free from the DOM so it can be tested
- * under plain `node --test` with hand-built measurement objects instead of
- * a real document. The parser is expected to walk the DOM, measure each
- * candidate block element (text length, link text length, paragraph count),
- * and hand the measurements to `scoreCandidate`/`pickBest` here.
+ * Which element on the page is the document body, when the known selectors
+ * miss. The parser walks the DOM and hands measurements in; the scoring
+ * itself never sees a document.
  */
 export class ContainerScore {
 
@@ -21,13 +12,8 @@ export class ContainerScore {
     static PARAGRAPH_WEIGHT = 0.1;
 
     /**
-     * Score one candidate element.
-     *
-     * `score = textLength * (1 - linkDensity) * (1 + 0.1 * paragraphCount)`
-     *
-     * Elements whose tag is nav/header/footer/aside are always excluded
-     * (score `-Infinity`) regardless of their measured content, so they can
-     * never win the fallback even if they happen to contain a lot of text.
+     * `score = textLength * (1 - linkDensity) * (1 + 0.1 * paragraphCount)`,
+     * with nav/header/footer/aside at `-Infinity` however much text they hold.
      *
      * @param {{textLength?: number, linkTextLength?: number, paragraphCount?: number, tagName?: string}} candidate
      * @returns {number}
@@ -46,10 +32,8 @@ export class ContainerScore {
     }
 
     /**
-     * Pick the highest-scoring candidate from a list.
-     * Each candidate may carry an arbitrary payload (e.g. a DOM element
-     * reference) alongside the measurement fields `scoreCandidate` reads;
-     * extra fields are ignored by the scorer and returned untouched.
+     * Extra fields on a candidate — a DOM reference, say — are ignored by the
+     * scorer and returned untouched.
      *
      * @template T
      * @param {Array<T & {textLength?: number, linkTextLength?: number, paragraphCount?: number, tagName?: string}>} candidates

@@ -1,17 +1,9 @@
 /**
- * popup-exports.js — the popup's export operations: rich clipboard copy,
- * .docx generation + download, and .txt download.
+ * The popup's exports: rich clipboard copy, .docx, .txt.
  *
- * Formerly `lib/export-service.js`. That file was dead code (spec v3 §1):
- * nothing imported it, and entry/popup.js reimplemented the same clipboard
- * and download logic inline instead — but with a two-tier fallback chain
- * (ClipboardItem → writeText → execCommand) and a single ClipboardItem that
- * carries *both* `text/html` and `text/plain`, which the old ExportService
- * never did (it only ever wrote plain text). Per the spec v3 §7 file map
- * this is where the two get merged into the one implementation; the
- * popup-only inline version is the one that survives because it's the one
- * that's actually correct — the old ExportService.copyToClipboard would
- * have pasted into Google Docs as unformatted text.
+ * The copy path writes one ClipboardItem carrying both `text/html` and
+ * `text/plain`, with a ClipboardItem → writeText → execCommand fallback
+ * chain. Writing plain text alone pastes into Google Docs unformatted.
  *
  * DOCX generation runs HERE (in the popup), not in the service worker,
  * because DocxGenerator needs DOM APIs (DOMParser, Node, etc.) that don't

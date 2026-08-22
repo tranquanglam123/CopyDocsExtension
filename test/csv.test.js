@@ -1,10 +1,10 @@
 /**
- * Unit tests for lib/csv-to-html.js — RFC-4180 CSV parsing and HTML
+ * Unit tests for lib/csv.js — RFC-4180 CSV parsing and HTML
  * rendering. Zero dependencies, run with:
  *
  *   node --test test/
  *
- * These must not require Chrome APIs (spec §11).
+ * These must not require Chrome APIs.
  */
 
 import test from 'node:test';

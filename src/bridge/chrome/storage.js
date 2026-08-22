@@ -1,15 +1,10 @@
 /**
- * storage.js — typed wrappers over chrome.storage.session/local, keyed by
- * the names in shared/constants.js (spec v3 §2/§4 P3). Besides
- * platform/net-rules.js (which owns its own rule-allocation bookkeeping —
- * see that file's header, kept move-don't-touch), this is the only place
- * that calls chrome.storage.* directly; extraction/pipeline-state.js and
- * the pipeline modules go through the functions here so `src/extraction/`
- * stays chrome-free.
+ * Typed wrappers over chrome.storage.session/local, keyed by lib/const.js.
+ * netrules.js keeps its own allocator bookkeeping; everything else comes here.
  */
 import { SESSION_KEYS, LOCAL_KEYS, EXTRACTION_STATUS } from '../../lib/const.js';
 
-// ─── Generic session helpers (used by extraction/pipeline-state.js) ───────
+// ─── Generic session helpers ──────────────────────────────────────────────
 
 /** @param {string|string[]} keys @returns {Promise<object>} */
 export async function sessionGet(keys) {
@@ -26,7 +21,7 @@ export async function sessionRemove(keys) {
     return chrome.storage.session.remove(keys);
 }
 
-// ─── Extraction status (spec §5, popup-facing contract) ────────────────────
+// ─── Extraction status: the popup-facing contract ─────────────────────────
 
 /**
  * @returns {Promise<{lastExtraction: object|null, status: string, error: string|null}>}
@@ -74,13 +69,10 @@ export async function setExtractionComplete(result) {
     });
 }
 
-// ─── Embed-images toggle (spec §4.4) ───────────────────────────────────────
-// Lives in chrome.storage.local (not .session) so it persists like a normal
-// setting, across browser restarts, not just across one extraction.
-// Default ON: whether Google Docs actually accepts `data:` URI images on
-// paste is unverified (spec §8 Q1), so ON is the useful-by-default guess
-// and the toggle is the escape hatch if that guess turns out to be wrong
-// for a given user/session.
+// ─── Embed-images toggle ──────────────────────────────────────────────────
+// .local, not .session: it is a setting, so it outlives one extraction.
+// Default ON, with the toggle as the escape hatch for a paste target that
+// rejects data: URIs.
 
 /** @returns {Promise<boolean>} */
 export async function isEmbedImagesEnabled() {

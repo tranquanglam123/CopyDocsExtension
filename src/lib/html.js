@@ -1,29 +1,6 @@
 /**
- * html-document.js — the single `wrapAsDocument` implementation (spec v3
- * §2/P3). Used to exist three times: `src/entry/content.js`'s DOMScanner,
- * `src/entry/offscreen.js`'s OffscreenParser, and `src/entry/background.js`'s
- * HtmlDocument (whose comment openly admitted it "deliberately mirrors" the
- * other two). Merged here.
- *
- * Drift found between the three copies during the merge (reported instead
- * of silently picked):
- *
- *  - CSS: content.js and offscreen.js were byte-identical — full rule set
- *    (h1/h2/h3/p/table/blockquote/ul/ol/li). background.js's `HtmlDocument`
- *    carried a reduced subset (only body/table/td/th), sufficient for its
- *    one caller (the Sheets swFetch pipeline, whose csv-derived HTML never
- *    contains headings/paragraphs/lists) but NOT a safe stand-in for the
- *    Docs path, which does. Kept: the fuller rule set — it's a strict
- *    superset, so the extra selectors are simply inert on Sheets' table-only
- *    output, whereas the reduced set would have dropped heading/list/
- *    blockquote styling had it been reused for Docs.
- *  - escapeHtml: offscreen.js and background.js both defensively wrap the
- *    input in `String(str)` before replacing; content.js's did not. Kept:
- *    the defensive version — majority (2 of 3) and strictly safer against a
- *    non-string `title`.
- *
- * Pure string templating — no Chrome APIs, no DOM. Usable from the service
- * worker (which has no DOM) and the offscreen document alike.
+ * The single `wrapAsDocument`. Pure string templating, so the service worker
+ * and the offscreen document can both use it.
  */
 
 /**
