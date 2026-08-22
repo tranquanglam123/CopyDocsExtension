@@ -19,6 +19,8 @@ export const dict = {
     'popup.action.copyTitle': 'Copy with formatting (paste into Google Docs / Word)',
     'popup.action.newDoc': 'New Doc',
     'popup.action.newDocTitle': 'Copy & open a new Google Doc — press Ctrl+V to paste',
+    'popup.action.reset': 'Extract another document',
+    'popup.action.resetTitle': 'Clear this result and work on another document',
     'popup.action.docx': '.docx',
     'popup.action.docxTitle': 'Download as Word document (.docx)',
     'popup.action.txt': '.txt',

@@ -16,6 +16,9 @@ export const getExtractionStatus = () => send({ action: MSG.EXTRACTION_STATUS })
 /** @returns {Promise<{success:boolean}>} */
 export const openNewDoc = () => send({ action: MSG.OPEN_NEW_DOC });
 
+/** Drop the finished result so the popup offers the current tab again. */
+export const resetExtraction = () => send({ action: MSG.RESET });
+
 /**
  * @param {string} text
  * @param {string} filename

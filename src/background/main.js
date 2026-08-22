@@ -5,7 +5,7 @@ import { MSG } from '../bridge/contract.js';
 import { getActiveTab, onTabRemoved, openNewDocTab } from '../bridge/chrome/tabs.js';
 import { downloadContent } from '../bridge/chrome/downloads.js';
 import { createWatchdogAlarm, onWatchdogAlarm } from '../bridge/chrome/alarms.js';
-import { getExtractionState } from '../bridge/chrome/storage.js';
+import { getExtractionState, clearExtractionState } from '../bridge/chrome/storage.js';
 import { runPipeline, runWatchdog, startupSweep, handleTabRemoved } from './extract/run.js';
 import { handleContentReady } from './extract/via-tabnav.js';
 
@@ -22,6 +22,7 @@ async function checkTab() {
         typeLabel: isValid ? UrlTransformer.getTypeLabel(tab.url) : null,
         url: tab.url,
         title: tab.title,
+        docId: isValid ? UrlTransformer.getDocId(tab.url) : null,
     };
 }
 
@@ -70,6 +71,11 @@ async function handleMessage(message, sender, sendResponse) {
                 } catch (err) {
                     sendResponse(errorResponse(err));
                 }
+                break;
+
+            case MSG.RESET:
+                await clearExtractionState();
+                sendResponse({ success: true });
                 break;
 
             case MSG.OPEN_NEW_DOC:

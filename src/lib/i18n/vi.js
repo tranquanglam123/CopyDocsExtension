@@ -21,6 +21,8 @@ export const dict = {
     'popup.action.copyTitle': 'Sao chép kèm định dạng (dán vào Google Docs / Word)',
     'popup.action.newDoc': 'Tài liệu mới',
     'popup.action.newDocTitle': 'Sao chép & mở Google Doc mới — nhấn Ctrl+V để dán',
+    'popup.action.reset': 'Trích xuất tài liệu khác',
+    'popup.action.resetTitle': 'Xoá kết quả này và làm tài liệu khác',
     'popup.action.docx': '.docx',
     'popup.action.docxTitle': 'Tải xuống dạng Word (.docx)',
     'popup.action.txt': '.txt',

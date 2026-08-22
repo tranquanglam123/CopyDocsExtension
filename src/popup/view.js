@@ -23,6 +23,8 @@ const btnNewDoc = document.getElementById('btn-new-doc');
 const btnDownloadDocx = document.getElementById('btn-download-docx');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
 const docxImageNote = document.getElementById('docx-image-note');
+const actionsReset = document.getElementById('actions-reset');
+const btnReset = document.getElementById('btn-reset');
 
 const notification = document.getElementById('notification');
 const notificationText = document.getElementById('notification-text');
@@ -41,6 +43,7 @@ export const elements = {
     btnNewDoc,
     btnDownloadDocx,
     btnDownloadTxt,
+    btnReset,
     chkEmbedImages,
     langSelect,
 };
@@ -189,9 +192,21 @@ export function beginExtractionUI() {
     btnExtract.disabled = true;
     progressSection.classList.remove('hidden');
     actionsExport.classList.add('hidden');
+    actionsReset.classList.add('hidden');
     docxImageNote.classList.add('hidden');
     notification.classList.add('hidden');
     warningsBanner.classList.add('hidden');
+}
+
+/** Back to the state a freshly opened popup is in. */
+export function clearResultUI() {
+    progressSection.classList.add('hidden');
+    actionsExport.classList.add('hidden');
+    actionsReset.classList.add('hidden');
+    docxImageNote.classList.add('hidden');
+    notification.classList.add('hidden');
+    warningsBanner.classList.add('hidden');
+    setStep(-1);
 }
 
 /** Render a completed extraction result. */
@@ -206,6 +221,7 @@ export function renderExtractionResult(data) {
     );
     showWarnings(data.meta?.warnings);
     actionsExport.classList.remove('hidden');
+    actionsReset.classList.remove('hidden');
     docxImageNote.classList.remove('hidden');
     btnExtract.disabled = true;
     showNotification(I18n.t('popup.notify.ready', { title: data.title }), 'success');

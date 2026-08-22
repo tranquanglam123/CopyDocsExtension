@@ -45,7 +45,7 @@ export async function runFetchHtmlPipeline(tab, target, docId) {
         await PipelineState.write({ phase: 'embedding-images' });
         result = await embedImagesIntoResult(result, tabId);
 
-        await setExtractionComplete(result);
+        await setExtractionComplete(result, docId);
 
         return result;
     } finally {

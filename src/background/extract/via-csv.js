@@ -82,7 +82,7 @@ export async function runSwFetchPipeline(tab, target, docId) {
             },
         };
 
-        await setExtractionComplete(result);
+        await setExtractionComplete(result, docId);
 
         return result;
     } finally {

@@ -171,6 +171,20 @@
 
     </section>
 
+    <!-- A finished result stays in session storage. Without this the popup
+         would keep showing it and never offer the next document. -->
+    <section id="actions-reset" class="actions hidden">
+      <button id="btn-reset" class="btn btn-secondary" data-i18n-title="popup.action.resetTitle"
+        title="Clear this result and work on another document">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+        </svg>
+        <span data-i18n="popup.action.reset">Extract another document</span>
+      </button>
+    </section>
+
     <!-- .docx image caveat — the DOCX writer is deferred to v2.2
          and currently ignores <img> entirely, so images embedded above only
          reach the clipboard (Copy / New Doc) output, never the .docx
