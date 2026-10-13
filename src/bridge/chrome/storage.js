@@ -27,25 +27,29 @@ export async function sessionRemove(keys) {
  * @returns {Promise<{lastExtraction: object|null, status: string, error: string|null}>}
  */
 export async function getExtractionState() {
-    const stored = await chrome.storage.session.get([
-        SESSION_KEYS.LAST_EXTRACTION,
-        SESSION_KEYS.EXTRACTION_STATUS,
-        SESSION_KEYS.LAST_EXTRACTION_ERROR,
+    const [local, session] = await Promise.all([
+        chrome.storage.local.get(LOCAL_KEYS.LAST_EXTRACTION),
+        chrome.storage.session.get([
+            SESSION_KEYS.EXTRACTION_STATUS,
+            SESSION_KEYS.LAST_EXTRACTION_ERROR,
+        ]),
     ]);
     return {
-        lastExtraction: stored[SESSION_KEYS.LAST_EXTRACTION] || null,
-        status: stored[SESSION_KEYS.EXTRACTION_STATUS] || EXTRACTION_STATUS.IDLE,
-        error: stored[SESSION_KEYS.LAST_EXTRACTION_ERROR] || null,
+        lastExtraction: local[LOCAL_KEYS.LAST_EXTRACTION] || null,
+        status: session[SESSION_KEYS.EXTRACTION_STATUS] || EXTRACTION_STATUS.IDLE,
+        error: session[SESSION_KEYS.LAST_EXTRACTION_ERROR] || null,
     };
 }
 
 /** Mark a new extraction as in-progress, clearing any previous result. */
 export async function setExtractionRunning() {
-    await chrome.storage.session.set({
-        [SESSION_KEYS.EXTRACTION_STATUS]: EXTRACTION_STATUS.RUNNING,
-        [SESSION_KEYS.LAST_EXTRACTION]: null,
-        [SESSION_KEYS.LAST_EXTRACTION_ERROR]: null,
-    });
+    await Promise.all([
+        chrome.storage.local.remove(LOCAL_KEYS.LAST_EXTRACTION),
+        chrome.storage.session.set({
+            [SESSION_KEYS.EXTRACTION_STATUS]: EXTRACTION_STATUS.RUNNING,
+            [SESSION_KEYS.LAST_EXTRACTION_ERROR]: null,
+        }),
+    ]);
 }
 
 /** @param {string} status */
@@ -68,18 +72,24 @@ export async function setExtractionError(message) {
  * @param {string} docId
  */
 export async function setExtractionComplete(result, docId) {
-    await chrome.storage.session.set({
-        [SESSION_KEYS.LAST_EXTRACTION]: { ...result, meta: { ...(result.meta || {}), docId } },
-        [SESSION_KEYS.EXTRACTION_STATUS]: EXTRACTION_STATUS.COMPLETE,
-    });
+    await Promise.all([
+        chrome.storage.local.set({
+            [LOCAL_KEYS.LAST_EXTRACTION]: { ...result, meta: { ...(result.meta || {}), docId } },
+        }),
+        chrome.storage.session.set({
+            [SESSION_KEYS.EXTRACTION_STATUS]: EXTRACTION_STATUS.COMPLETE,
+        }),
+    ]);
 }
 
 /** Clear the finished result so the popup offers the current tab again. */
 export async function clearExtractionState() {
-    await chrome.storage.session.remove([
-        SESSION_KEYS.LAST_EXTRACTION,
-        SESSION_KEYS.EXTRACTION_STATUS,
-        SESSION_KEYS.LAST_EXTRACTION_ERROR,
+    await Promise.all([
+        chrome.storage.local.remove(LOCAL_KEYS.LAST_EXTRACTION),
+        chrome.storage.session.remove([
+            SESSION_KEYS.EXTRACTION_STATUS,
+            SESSION_KEYS.LAST_EXTRACTION_ERROR,
+        ]),
     ]);
 }
 
