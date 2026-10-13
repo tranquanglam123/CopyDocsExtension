@@ -29,6 +29,7 @@
     "declarativeNetRequest",
     "notifications",
     "storage",
+    "unlimitedStorage",
     "offscreen",
     "alarms"
   ],

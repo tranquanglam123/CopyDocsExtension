@@ -12,8 +12,6 @@ export const SESSION_KEYS = Object.freeze({
     PIPELINE: 'pipeline',
     /** Map of allocated DNR rule id → tab id. */
     RULE_ALLOC: 'ruleAlloc',
-    /** Last completed extraction result, so a reopened popup can recover it. */
-    LAST_EXTRACTION: 'lastExtraction',
     /** 'idle' | 'running' | 'complete' | 'error'. */
     EXTRACTION_STATUS: 'extractionStatus',
     /** Human-readable message for the last failure. */
@@ -26,6 +24,14 @@ export const LOCAL_KEYS = Object.freeze({
     EMBED_IMAGES: 'embedImagesEnabled',
     /** Selected UI language ('en' | 'vi'), set from the popup. */
     LANGUAGE: 'uiLanguage',
+    /**
+     * Last completed extraction result, so a reopened popup can recover it.
+     * Embedded images can run tens of MB — storage.session's ~10MB quota
+     * cannot be lifted, storage.local's can (unlimitedStorage), so this one
+     * key lives in local despite the rest of the extraction state being
+     * session-scoped.
+     */
+    LAST_EXTRACTION: 'lastExtraction',
 });
 
 // ─── Extraction status values ───────────────────────────────────────────────
