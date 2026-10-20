@@ -257,11 +257,10 @@ Reload the unpacked extension first: the manifest gained
 | E6 | A scanned (image-only) PDF | Pages come back as pictures with `pdf_pages_as_images:<n>`. |
 | E7 | `chrome://extensions` | "Nothing to extract here", Extract disabled. |
 
-Offscreen parsers can be exercised without the extension: serve the repo
-over http and import `src/offscreen/file/index.js` from a page, passing a
-file as base64 to `parseFile(base64, 'pdf' | 'zip')`. Set
-`window.requestAnimationFrame = () => 0` before importing: the offscreen
-document is hidden and rAF never fires there, which a visible tab hides.
+Offscreen parsers and the .docx writer can be exercised without the
+extension: see `tools/harness/README.md`. Its pages disable
+`requestAnimationFrame`: the offscreen document is hidden and rAF never
+fires there, which a visible tab would hide.
 
 ---
 
