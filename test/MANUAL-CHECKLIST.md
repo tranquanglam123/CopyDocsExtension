@@ -242,6 +242,29 @@ directly from the service worker console, no experimentation needed.
 
 ---
 
+## Path E — web pages with embedded material
+
+Reload the unpacked extension first: the manifest gained
+`optional_host_permissions` and a CSP allowing pdf.js's WebAssembly.
+
+| # | Open | Expect |
+|---|---|---|
+| E1 | `https://thcs.toanmath.com/2026/05/de-cuoi-ki-2-toan-8-nam-2025-2026-truong-thcs-le-thien-hai-phong.html` | Popup: "Embedded: PDF". Extract: no permission prompt (same origin), ~25k characters, `legacy_vn_font` warning, **Original file** downloads the PDF. |
+| E2 | A thuvienhoclieu.com post with an Office Online viewer | "Embedded: Word". Result has headings and bold; MathType equations show as one line of text (e.g. `(x−1)/y`) with the `docx_equations_converted` warning. The **.docx** download opens in Word with every equation in place as a Word equation, editable without MathType. |
+| E3 | A page embedding `drive.google.com/file/d/…/preview` | Extract asks for drive.google.com access once. Declining still extracts the page article with `embed_failed:1`. |
+| E4 | A plain article page with no embeds | "No embedded file found"; result is the article with `page_article_used`. |
+| E5 | A `.pdf` opened directly in a tab | Detected; permission prompt for that host; PDF text extracted. |
+| E6 | A scanned (image-only) PDF | Pages come back as pictures with `pdf_pages_as_images:<n>`. |
+| E7 | `chrome://extensions` | "Nothing to extract here", Extract disabled. |
+
+Offscreen parsers can be exercised without the extension: serve the repo
+over http and import `src/offscreen/file/index.js` from a page, passing a
+file as base64 to `parseFile(base64, 'pdf' | 'zip')`. Set
+`window.requestAnimationFrame = () => 0` before importing: the offscreen
+document is hidden and rAF never fires there, which a visible tab hides.
+
+---
+
 ## What is NOT covered by this checklist
 
 - The structural container-detection **fallback** (`src/lib/score.js`

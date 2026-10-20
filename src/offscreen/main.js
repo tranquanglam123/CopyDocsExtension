@@ -1,6 +1,7 @@
 /**
- * Offscreen document (reasons: ['DOM_PARSER']). Takes raw fetched HTML from
- * the service worker and returns the structured-content shape.
+ * Offscreen document (reasons: ['DOM_PARSER']). Takes raw fetched HTML, or a
+ * PDF/DOCX file, from the service worker and returns the structured-content
+ * shape.
  *
  * The HTML is loaded into a sandboxed iframe so the document's own <style>
  * block resolves in a real CSS cascade: mobilebasic puts bold/italic in
@@ -10,12 +11,13 @@
 import { HtmlSanitize } from '../lib/sanitize.js';
 import { wrapAsDocument } from '../lib/html.js';
 import { WARNINGS } from '../lib/const.js';
-import { onParseRequest } from '../bridge/chrome/runtime.js';
+import { onParseRequest, onParseFileRequest } from '../bridge/chrome/runtime.js';
 import { createSandbox, loadSrcdoc } from './sandbox.js';
 import { findContainer, removeNoise } from './pass/container.js';
 import { extractTitle } from './pass/title.js';
 import { extractPlainText } from './pass/text.js';
 import { extractBodyHtml } from './pass/html.js';
+import { parseFile } from './file/index.js';
 
 /**
  * @param {string} html
@@ -81,3 +83,4 @@ async function parseHtml(html, docType) {
 }
 
 onParseRequest(parseHtml);
+onParseFileRequest(parseFile);

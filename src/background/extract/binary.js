@@ -9,8 +9,10 @@
  * A non-`image/*` content-type may be a genuine non-bitmap resource or a
  * login wall served in its place. Only a wall falls through to T2, so a
  * bounded prefix is decoded and handed to `detectWall` to tell them apart.
+ *
+ * `fetchFile` reuses both tiers for the PDF/DOCX files web pages embed.
  */
-import { IMAGE_LIMITS } from '../../lib/const.js';
+import { IMAGE_LIMITS, FILE_LIMITS } from '../../lib/const.js';
 import { detectWall, isImageContentType, SMALL_BODY_WALL_THRESHOLD } from '../../lib/wall.js';
 import { executeInTab } from '../../bridge/chrome/scripting.js';
 
@@ -72,11 +74,12 @@ function withTimeout(promise, ms) {
 /**
  * T1: fetch an image URL directly from the service worker.
  * @param {string} url
+ * @param {number} [timeoutMs]
  * @returns {Promise<{ok: boolean, base64: string, byteLength: number, contentType: string, status: number, finalUrl: string}>}
  */
-export async function swFetchBinary(url) {
+export async function swFetchBinary(url, timeoutMs = IMAGE_FETCH_TIMEOUT_MS) {
     const controller = new AbortController();
-    const abortTimer = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+    const abortTimer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
         const response = await fetch(url, { credentials: 'include', signal: controller.signal });
@@ -103,9 +106,10 @@ export async function swFetchBinary(url) {
  * executeScript cannot return a Blob.
  * @param {number} tabId
  * @param {string} path  Same-origin URL to fetch, inside the tab.
+ * @param {number} [timeoutMs]
  * @returns {Promise<{ok: boolean, base64: string, byteLength: number, contentType: string, status: number, finalUrl: string}>}
  */
-export async function csFetchBinary(tabId, path) {
+export async function csFetchBinary(tabId, path, timeoutMs = IMAGE_FETCH_TIMEOUT_MS) {
     let result;
     try {
         result = await executeInTab(
@@ -140,7 +144,7 @@ export async function csFetchBinary(tabId, path) {
                     clearTimeout(abortTimer);
                 }
             },
-            [path, IMAGE_FETCH_TIMEOUT_MS]
+            [path, timeoutMs]
         );
     } catch (err) {
         console.warn('[Transport] csFetchBinary executeScript failed:', err?.message || err);
@@ -213,4 +217,33 @@ export async function fetchBinary({ url, tabId }) {
         ok: false, base64: '', byteLength: 0, contentType: '', status: sw.status,
         finalUrl: sw.finalUrl, transport: 'swFetch', wallReason: failures[failures.length - 1],
     };
+}
+
+/**
+ * A whole embedded file. A same-origin file is read inside the tab first:
+ * first-party cookies, and no host permission beyond activeTab. Any other
+ * is read from the worker first, which works once its host is granted.
+ * What the bytes are is the caller's check, not a tier failure.
+ *
+ * @param {{url: string, tabId?: number, sameOrigin: boolean}} opts
+ * @returns {Promise<{ok: boolean, base64: string, byteLength: number, contentType: string, status: number, finalUrl: string, transport?: string}>}
+ */
+export async function fetchFile({ url, tabId, sameOrigin }) {
+    const timeoutMs = FILE_LIMITS.TIMEOUT_MS;
+    const sw = { transport: 'swFetch', run: () => swFetchBinary(url, timeoutMs) };
+    const cs = { transport: 'csFetch', run: () => csFetchBinary(tabId, url, timeoutMs) };
+    const hasTab = tabId !== undefined && tabId !== null;
+    const tiers = !hasTab ? [sw] : sameOrigin ? [cs, sw] : [sw, cs];
+
+    let last = { ok: false, base64: '', byteLength: 0, contentType: '', status: 0, finalUrl: url };
+    for (const tier of tiers) {
+        const result = await withTimeout(tier.run(), timeoutMs + 500);
+        if (result.ok && result.byteLength > 0) {
+            console.log(`[Transport] ${tier.transport} read ${result.byteLength} bytes from ${url}.`);
+            return { ...result, transport: tier.transport };
+        }
+        console.warn(`[Transport] ${tier.transport} failed for ${url} (HTTP ${result.status}).`);
+        last = result;
+    }
+    return { ...last, ok: false };
 }

@@ -12,6 +12,7 @@ import {
     getEmbedImages, setEmbedImages,
 } from '../bridge/prefs.js';
 import * as background from '../bridge/to-background.js';
+import { ensureOrigins } from '../bridge/chrome/permissions.js';
 import * as view from './view.js';
 import * as exportsApi from './export.js';
 
@@ -20,6 +21,8 @@ import * as exportsApi from './export.js';
 let extractedData = null;
 let currentDocTitle = 'document';
 let currentDocType = null;
+/** Host patterns a web tab's embedded files need, from CHECK_TAB. */
+let currentOrigins = [];
 let pollTimer = null;
 
 /**
@@ -82,7 +85,7 @@ export async function handleLanguageChange() {
 function rerenderCurrentView() {
     const { kind, payload } = currentView;
     switch (kind) {
-        case VIEWS.DOC_DETECTED: view.renderDocDetected(payload.type, payload.url); break;
+        case VIEWS.DOC_DETECTED: renderDetected(payload); break;
         case VIEWS.NOT_A_DOC: view.renderNotADoc(); break;
         case VIEWS.SLIDES_UNSUPPORTED: view.renderSlidesUnsupported(); break;
         case VIEWS.INIT_ERROR: view.renderInitError(payload.message); break;
@@ -94,6 +97,24 @@ function rerenderCurrentView() {
             break;
         default: break; // 'idle' — nothing dynamic to redraw
     }
+}
+
+/** A web tab says what it embeds; a Google tab names its type. */
+function renderDetected(tab) {
+    if (tab.type !== DOC_TYPES.WEB) {
+        view.renderDocDetected(tab.type, tab.url);
+        return;
+    }
+    const kinds = [...new Set((tab.embeds || []).map(embedLabel))];
+    view.renderWebDetected(kinds.length
+        ? I18n.t('popup.status.webEmbeds', { kinds: kinds.join(', ') })
+        : I18n.t('popup.status.webNoEmbeds'));
+}
+
+const EXT_LABELS = { pdf: 'embed.pdf', doc: 'embed.word', docx: 'embed.word', ppt: 'embed.powerpoint', pptx: 'embed.powerpoint', xls: 'embed.excel', xlsx: 'embed.excel' };
+
+function embedLabel(embed) {
+    return I18n.t(EXT_LABELS[embed.ext] || `embed.${embed.kind}`);
 }
 
 // ── Embed-images toggle ────────────────────────────────────────────
@@ -132,6 +153,7 @@ export async function init() {
 
         currentDocTitle = decision.tab?.title || 'document';
         currentDocType = decision.tab?.type || null;
+        currentOrigins = decision.tab?.origins || [];
 
         switch (decision.view) {
             case VIEWS.RESULT:
@@ -149,10 +171,12 @@ export async function init() {
                 view.renderSlidesUnsupported();
                 break;
 
-            case VIEWS.DOC_DETECTED:
-                setView(VIEWS.DOC_DETECTED, { type: decision.tab.type, url: decision.tab.url });
-                view.renderDocDetected(decision.tab.type, decision.tab.url);
+            case VIEWS.DOC_DETECTED: {
+                const { type, url, embeds } = decision.tab;
+                setView(VIEWS.DOC_DETECTED, { type, url, embeds });
+                renderDetected({ type, url, embeds });
                 break;
+            }
 
             default:
                 setView(VIEWS.NOT_A_DOC);
@@ -212,6 +236,13 @@ export async function handleExtract() {
         return;
     }
 
+    // First, before any other await: Chrome only shows the permission
+    // prompt inside the click's user gesture.
+    if (currentOrigins.length > 0) {
+        const granted = await ensureOrigins(currentOrigins).catch(() => false);
+        if (!granted) view.showNotification(I18n.t('popup.notify.permissionDenied'), 'info');
+    }
+
     view.beginExtractionUI();
 
     // Docs and Sheets both default to a transport that never touches the
@@ -226,7 +257,9 @@ export async function handleExtract() {
         await delay(300);
 
         view.setStep(1);
-        const fetchingKey = currentDocType === DOC_TYPES.SHEETS ? 'popup.status.fetchingSheet' : 'popup.status.fetchingDoc';
+        const fetchingKey = currentDocType === DOC_TYPES.SHEETS ? 'popup.status.fetchingSheet'
+            : currentDocType === DOC_TYPES.WEB ? 'popup.status.fetchingEmbed'
+                : 'popup.status.fetchingDoc';
         setView(VIEWS.EXTRACTING, { detailKey: fetchingKey });
         view.setStatus('🔄', I18n.t('popup.status.extracting'), I18n.t(fetchingKey));
         await delay(300);
@@ -300,7 +333,7 @@ export async function handleDownloadDocx() {
     const filename = exportsApi.sanitizeFilename(extractedData.title || currentDocTitle) + '.docx';
 
     try {
-        await exportsApi.downloadDocx(extractedData.bodyHtml, extractedData.title || currentDocTitle, filename);
+        await exportsApi.downloadDocx(extractedData.bodyHtml, extractedData.title || currentDocTitle, filename, extractedData.ole);
         view.showNotification(I18n.t('popup.notify.docxDownloading', { filename }), 'success');
     } catch (err) {
         console.error('[Popup] DOCX generation error:', err);
@@ -320,6 +353,20 @@ export async function handleDownloadTxt() {
         view.showNotification(I18n.t('popup.notify.txtDownloading', { filename }), 'success');
     } catch (err) {
         view.showNotification(I18n.t('popup.notify.txtFailed', { message: err.message }), 'error');
+    }
+}
+
+// ── Download original files (web pages) ─────────────────────────
+
+export async function handleDownloadOriginal() {
+    const files = extractedData?.meta?.sourceFiles;
+    if (!files?.length) return;
+
+    try {
+        await exportsApi.downloadOriginals(files);
+        view.showNotification(I18n.t('popup.notify.originalDownloading', { count: files.length }), 'success');
+    } catch (err) {
+        view.showNotification(I18n.t('popup.notify.originalFailed', { message: err.message }), 'error');
     }
 }
 

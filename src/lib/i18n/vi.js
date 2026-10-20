@@ -6,7 +6,7 @@
  */
 export const dict = {
     // ─── Static popup chrome (filled via I18n.apply(), data-i18n*) ────────
-    'popup.subtitle': 'Trích xuất Google Docs bị hạn chế quyền truy cập',
+    'popup.subtitle': 'Trích xuất Google Docs và học liệu nhúng trên trang web',
     'popup.status.checking': 'Đang kiểm tra…',
     'popup.step.validate': 'Kiểm tra',
     'popup.step.fetch': 'Tải về',
@@ -27,13 +27,15 @@ export const dict = {
     'popup.action.docxTitle': 'Tải xuống dạng Word (.docx)',
     'popup.action.txt': '.txt',
     'popup.action.txtTitle': 'Tải xuống dạng văn bản thuần (.txt)',
-    'popup.docxNote': 'Lưu ý: hình ảnh chưa được đưa vào file .docx tải xuống — hãy dùng Sao chép hoặc Tài liệu mới để giữ lại hình ảnh.',
+    'popup.action.original': 'File gốc',
+    'popup.action.originalTitle': 'Tải file PDF/Word gốc — giữ nguyên công thức và bố cục',
+    'popup.docxNote': 'Lưu ý: chỉ hình đã nhúng mới có trong file .docx — hãy bật "Nhúng hình ảnh" trước khi trích xuất.',
     'popup.footer.languageLabel': 'Ngôn ngữ',
 
     // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': 'Đã phát hiện {type}',
-    'popup.status.notADocTitle': 'Không phải Google Doc',
-    'popup.status.notADocDetail': 'Hãy mở một Google Doc, Sheet hoặc Slide.',
+    'popup.status.notADocTitle': 'Không có gì để trích xuất',
+    'popup.status.notADocDetail': 'Hãy mở Google Doc, Sheet, hoặc một trang web có học liệu.',
     'popup.status.slidesTitle': 'Chưa hỗ trợ Google Slides',
     'popup.status.slidesDetail': 'Trích xuất Slides chưa khả dụng ở phiên bản này — hãy thử với Doc hoặc Sheet.',
     'popup.status.initErrorTitle': 'Lỗi',
@@ -46,12 +48,24 @@ export const dict = {
     'popup.status.validating': 'Đang kiểm tra URL tài liệu',
     'popup.status.fetchingSheet': 'Đang tải dữ liệu bảng tính trực tiếp — không cần điều hướng tab',
     'popup.status.fetchingDoc': 'Đang tải HTML của tài liệu trực tiếp — không cần điều hướng tab',
+    'popup.status.fetchingEmbed': 'Đang đọc các file nhúng trong trang',
+    'popup.status.webEmbeds': 'Có nhúng: {kinds}',
+    'popup.status.webNoEmbeds': 'Không thấy file nhúng — sẽ trích xuất nội dung bài viết',
     'popup.status.parsing': 'Đang phân tích định dạng tài liệu',
 
     // ─── Document type labels ──────────────────────────────────────────────
     'docType.docs': 'Google Doc',
     'docType.sheets': 'Google Sheet',
     'docType.slides': 'Google Slides',
+    'docType.web': 'trang web',
+    'embed.pdf': 'PDF',
+    'embed.word': 'Word',
+    'embed.powerpoint': 'PowerPoint',
+    'embed.excel': 'Excel',
+    'embed.gdoc': 'Google Doc',
+    'embed.gsheet': 'Google Sheet',
+    'embed.html': 'trang Google đã xuất bản',
+    'embed.file': 'file',
 
     // ─── Notification toasts ───────────────────────────────────────────────
     'popup.notify.ready': '"{title}" đã sẵn sàng — sao chép, mở tài liệu mới, hoặc tải xuống!',
@@ -64,6 +78,9 @@ export const dict = {
     'popup.notify.docxFailed': 'Tải xuống thất bại: {message}',
     'popup.notify.txtDownloading': 'Đang tải xuống "{filename}"',
     'popup.notify.txtFailed': 'Tải xuống thất bại: {message}',
+    'popup.notify.originalDownloading': 'Đang tải {count} file gốc',
+    'popup.notify.originalFailed': 'Tải xuống thất bại: {message}',
+    'popup.notify.permissionDenied': 'Chưa được cấp quyền đọc trang chứa file — file nhúng có thể không đọc được. Nút File gốc vẫn dùng được.',
 
     // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──
     'warning.single_sheet_only': 'Chỉ trang tính đầu tiên được đọc (gid=0) — các trang tính khác trong bảng tính này chưa được trích xuất.',
@@ -76,6 +93,15 @@ export const dict = {
     'warning.image_budget_exceeded': 'Một số hình ảnh quá lớn để nhúng trong giới hạn dung lượng cho phép, nên được giữ dưới dạng liên kết tới Google Docs — các liên kết này chỉ hoạt động khi phiên đăng nhập của bạn còn truy cập được.',
     'warning.image_embed_failed': '{count} hình ảnh không thể tải về và được giữ dưới dạng liên kết tới Google Docs thay vì nhúng trực tiếp.',
     'warning.image_not_bitmap': '{count} hình ảnh không thể nhúng vì nguồn không thực sự là hình ảnh (ví dụ: trang xem trước, không phải bitmap) — đã giữ dưới dạng liên kết.',
+    'warning.page_article_used': 'Không tìm thấy file nhúng nên đã trích xuất nội dung chữ của chính trang web.',
+    'warning.legacy_vn_font': 'File dùng font tiếng Việt cũ (VNI hoặc TCVN3) nên một số chữ có thể bị lỗi — hãy tải file gốc để giữ nguyên.',
+    'warning.pdf_render_budget_exceeded': 'Một số trang hoặc hình trong PDF đã bị bỏ qua để giữ kết quả trong giới hạn dung lượng — hãy tải file gốc để có đầy đủ.',
+    'warning.pdf_pages_as_images': '{count} trang PDF không có lớp chữ (bản scan) nên được giữ dưới dạng hình — không chỉnh sửa được như văn bản.',
+    'warning.docx_images_skipped': '{count} hình hoặc công thức trong file Word ở định dạng trình duyệt không vẽ được (WMF/EMF, thường là MathType) và được đánh dấu [■] — hãy tải file gốc để giữ lại.',
+    'warning.docx_equations_converted': '{count} công thức MathType đã được chuyển thành công thức Word: file .docx tải xuống sửa được mà không cần MathType, còn khi Sao chép chúng hiện dạng chữ một dòng (vd (x−1)/y).',
+    'warning.docx_equations_kept': '{count} object nhúng không chuyển được nên hiện [■] khi Sao chép và Tài liệu mới — file .docx tải xuống giữ nguyên object gốc (muốn sửa cần chương trình đã tạo ra nó, vd MathType).',
+    'warning.embed_failed': '{count} file nhúng không đọc được — hãy thử nút File gốc.',
+    'warning.embeds_over_limit': 'Còn {count} file nhúng khác trong trang chưa được đọc.',
     'warning.low_confidence': 'Độ tin cậy trích xuất thấp — kết quả có thể chưa đầy đủ.',
     'warning.multi_tab_partial': 'Tài liệu nhiều tab: chỉ tab đầu tiên được trích xuất.',
 
@@ -86,7 +112,7 @@ export const dict = {
     'error.sheetAccessWall': 'Bảng tính này yêu cầu quyền truy cập — tiện ích không thể đọc được (phát hiện rào chắn truy cập trong phản hồi).',
     'error.sheetNonCsvResponse': 'Điểm cuối bảng tính trả về phản hồi không phải CSV — trang tính có thể bị hạn chế, trống, hoặc điểm cuối gviz đã thay đổi.',
     'error.extractionInProgress': 'Đang có một lượt trích xuất khác chạy — hãy đợi hoàn tất trước khi bắt đầu lượt mới.',
-    'error.notADocPage': 'Tab hiện tại không phải trang Google Docs, Sheets hoặc Slides.',
+    'error.notADocPage': 'Tab hiện tại không phải trang Google Docs, cũng không phải trang web đọc được.',
     'error.slidesUnsupported': 'Google Slides chưa được hỗ trợ.',
     'error.noExtractionTarget': 'Không thể tạo mục tiêu trích xuất cho URL này.',
     'error.emptyPayload': 'Content script gửi về dữ liệu rỗng.',
@@ -97,4 +123,8 @@ export const dict = {
     'error.extractionFailed': 'Trích xuất thất bại.',
     'error.downloadFailed': 'Tải xuống thất bại.',
     'error.checkStatusFallback': 'Xem console của trình duyệt để biết chi tiết.',
+    'error.pageScanFailed': 'Tiện ích không đọc được trang này (trang của trình duyệt hoặc Web Store?): {message}',
+    'error.embedFetchFailed': 'Không tải được file nhúng (HTTP {status}).',
+    'error.embedTooLarge': 'File nhúng quá lớn để đọc ({mb} MB) — hãy dùng nút File gốc.',
+    'error.embedUnsupportedType': 'Chưa đọc được file nhúng dạng {type} — hãy dùng nút File gốc.',
 };

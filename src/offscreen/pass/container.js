@@ -10,9 +10,16 @@ const CONTAINER_SELECTORS = [
     '.grid-container',
     '.punch-viewer-content',
     '.slide-content',
+    // Web pages: the post body as WordPress and most CMS themes mark it.
+    '[itemprop="articleBody"]',
+    '.entry-content',
+    '.post-content',
+    '.td-post-content',
+    'article',
+    'main',
 ];
 
-/** Google UI chrome — never real document content. */
+/** Google UI chrome and site furniture — never real document content. */
 const NOISE_SELECTORS = [
     'nav', 'header', 'footer',
     '[role="navigation"]',
@@ -24,6 +31,8 @@ const NOISE_SELECTORS = [
     '.mobile-topbar',
     '.docs-ml-header',
     '#docs-header',
+    // Web page furniture around a post.
+    'aside', 'form', '#comments', '.comments-area', '.sharedaddy', '.related-posts', '.yarpp-related',
 ];
 
 /** Tags scored as structural-fallback candidates. */

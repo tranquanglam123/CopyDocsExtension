@@ -95,6 +95,17 @@ describe('chrome access', () => {
             'content/main.js imports — MV3 content scripts are not ES modules'
         );
     });
+
+    test('every injected content script exists and is a plain script too', () => {
+        const contract = read('src/bridge/contract.js');
+        const block = contract.match(/CONTENT_SCRIPTS = Object\.freeze\(\{([\s\S]*?)\}\)/)?.[1] || '';
+        const files = [...block.matchAll(/'(src\/content\/[^']+\.js)'/g)].map((m) => m[1]);
+        assert.ok(files.length > 0, 'CONTENT_SCRIPTS lists no file');
+        for (const file of files) {
+            assert.ok(existsSync(join(ROOT, file)), `${file} is in CONTENT_SCRIPTS but missing`);
+            assert.ok(!/^\s*(import|export)\s/m.test(code(read(file))), `${file} is a module — executeScript files are not`);
+        }
+    });
 });
 
 // ─── 2. DOM access follows the realm ────────────────────────────────────────

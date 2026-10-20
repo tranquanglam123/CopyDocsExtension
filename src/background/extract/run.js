@@ -1,5 +1,5 @@
 /**
- * Dispatch to via-fetch, via-csv or via-tabnav, plus the concurrency guard.
+ * Dispatch to via-fetch, via-csv, via-embed or via-tabnav, plus the concurrency guard.
  * The watchdog and the startup sweep here are what stop a tab being left
  * script-blocked when the service worker is killed mid-extraction.
  */
@@ -20,6 +20,7 @@ import { PipelineState } from './state.js';
 import { runFetchHtmlPipeline } from './via-fetch.js';
 import { runSwFetchPipeline } from './via-csv.js';
 import { runTabNavPipeline } from './via-tabnav.js';
+import { runEmbedPipeline } from './via-embed.js';
 
 /** A pipeline older than this is considered abandoned (SW was killed). */
 const PIPELINE_TIMEOUT_MS = TIMING.PIPELINE_TIMEOUT_MS;
@@ -82,7 +83,7 @@ export async function runPipeline() {
 
 /**
  * 'fetch' → via-fetch, falling back to via-tabnav when every tier fails.
- * 'swFetch' → via-csv. Anything else → via-tabnav.
+ * 'swFetch' → via-csv. 'embed' → via-embed. Anything else → via-tabnav.
  *
  * @param {object} tab   The active tab (chrome tabs.Tab shape).
  * @param {{url: string, parser: string, mode: string}} target
@@ -92,6 +93,10 @@ export async function runPipeline() {
 export async function dispatchTransport(tab, target, docId) {
     if (target.mode === TRANSPORTS.SW_FETCH) {
         return runSwFetchPipeline(tab, target, docId);
+    }
+
+    if (target.mode === TRANSPORTS.EMBED) {
+        return runEmbedPipeline(tab, target, docId);
     }
 
     if (target.mode === 'fetch') {

@@ -1,30 +1,17 @@
 /** Service worker entry: wiring and listener registration only. */
-import { UrlTransformer } from '../lib/url.js';
 import { onActionMessage, onStartupOrInstall } from '../bridge/chrome/runtime.js';
 import { MSG } from '../bridge/contract.js';
-import { getActiveTab, onTabRemoved, openNewDocTab } from '../bridge/chrome/tabs.js';
+import { onTabRemoved, openNewDocTab } from '../bridge/chrome/tabs.js';
 import { downloadContent } from '../bridge/chrome/downloads.js';
 import { createWatchdogAlarm, onWatchdogAlarm } from '../bridge/chrome/alarms.js';
 import { getExtractionState, clearExtractionState } from '../bridge/chrome/storage.js';
 import { runPipeline, runWatchdog, startupSweep, handleTabRemoved } from './extract/run.js';
 import { handleContentReady } from './extract/via-tabnav.js';
+import { checkTab } from './check.js';
 
 // AppError's code/params are duck-typed through so the popup can translate;
 // a plain Error degrades to its raw message.
 const errorResponse = (err) => ({ success: false, error: err.message, code: typeof err.code === 'string' ? err.code : undefined, params: err.params });
-/** @returns {Promise<object>} */
-async function checkTab() {
-    const tab = await getActiveTab();
-    const { isValid, type } = UrlTransformer.identify(tab.url);
-    return {
-        isValid,
-        type,
-        typeLabel: isValid ? UrlTransformer.getTypeLabel(tab.url) : null,
-        url: tab.url,
-        title: tab.title,
-        docId: isValid ? UrlTransformer.getDocId(tab.url) : null,
-    };
-}
 
 // registerMessageHandler drops anything without a string `action`, so the
 // offscreen document's `{type:'parse'}` never reaches this switch.

@@ -4,7 +4,7 @@
  */
 export const dict = {
     // ─── Static popup chrome (filled via I18n.apply(), data-i18n*) ────────
-    'popup.subtitle': 'Extract restricted Google Docs',
+    'popup.subtitle': 'Extract Google Docs and learning material embedded in web pages',
     'popup.status.checking': 'Checking…',
     'popup.step.validate': 'Validate',
     'popup.step.fetch': 'Fetch',
@@ -25,13 +25,15 @@ export const dict = {
     'popup.action.docxTitle': 'Download as Word document (.docx)',
     'popup.action.txt': '.txt',
     'popup.action.txtTitle': 'Download as plain text (.txt)',
-    'popup.docxNote': "Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.",
+    'popup.action.original': 'Original file',
+    'popup.action.originalTitle': 'Download the original PDF/Word file — keeps equations and layout exactly',
+    'popup.docxNote': "Note: only embedded pictures reach the .docx — keep \"Embed images\" on before extracting.",
     'popup.footer.languageLabel': 'Language',
 
     // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': '{type} detected',
-    'popup.status.notADocTitle': 'Not a Google Doc',
-    'popup.status.notADocDetail': 'Navigate to a Google Doc, Sheet, or Slide.',
+    'popup.status.notADocTitle': 'Nothing to extract here',
+    'popup.status.notADocDetail': 'Open a Google Doc or Sheet, or a web page with learning material.',
     'popup.status.slidesTitle': 'Google Slides not supported yet',
     'popup.status.slidesDetail': "Slides extraction isn't available in this version — try a Doc or Sheet instead.",
     'popup.status.initErrorTitle': 'Error',
@@ -44,12 +46,24 @@ export const dict = {
     'popup.status.validating': 'Validating document URL',
     'popup.status.fetchingSheet': 'Fetching spreadsheet data directly — no tab navigation needed',
     'popup.status.fetchingDoc': 'Fetching document HTML directly — no tab navigation needed',
+    'popup.status.fetchingEmbed': 'Reading the files embedded in this page',
+    'popup.status.webEmbeds': 'Embedded: {kinds}',
+    'popup.status.webNoEmbeds': 'No embedded file found — the page article will be extracted',
     'popup.status.parsing': 'Parsing document formatting',
 
     // ─── Document type labels ──────────────────────────────────────────────
     'docType.docs': 'Google Doc',
     'docType.sheets': 'Google Sheet',
     'docType.slides': 'Google Slides',
+    'docType.web': 'web page',
+    'embed.pdf': 'PDF',
+    'embed.word': 'Word',
+    'embed.powerpoint': 'PowerPoint',
+    'embed.excel': 'Excel',
+    'embed.gdoc': 'Google Doc',
+    'embed.gsheet': 'Google Sheet',
+    'embed.html': 'published Google page',
+    'embed.file': 'file',
 
     // ─── Notification toasts ───────────────────────────────────────────────
     'popup.notify.ready': '"{title}" ready — copy, open in new doc, or download!',
@@ -62,6 +76,9 @@ export const dict = {
     'popup.notify.docxFailed': 'Download failed: {message}',
     'popup.notify.txtDownloading': 'Downloading "{filename}"',
     'popup.notify.txtFailed': 'Download failed: {message}',
+    'popup.notify.originalDownloading': 'Downloading {count} original file(s)',
+    'popup.notify.originalFailed': 'Download failed: {message}',
+    'popup.notify.permissionDenied': 'Access to the other site was not granted — the embedded file may not be readable. Original file download still works.',
 
     // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──
     'warning.single_sheet_only': 'Only the first sheet was read (gid=0) — other sheets in this spreadsheet were not extracted.',
@@ -74,6 +91,15 @@ export const dict = {
     'warning.image_budget_exceeded': 'Some images were too large to embed within the size budget, so they were left as links to Google Docs instead — they will only work while your session can reach them.',
     'warning.image_embed_failed': '{count} image(s) could not be fetched and were left as links to Google Docs instead of being embedded.',
     'warning.image_not_bitmap': "{count} image(s) could not be embedded because the source wasn't actually a picture (e.g. a viewer page, not a bitmap) — left as a link instead.",
+    'warning.page_article_used': 'No embedded file was found, so the text of the page itself was extracted.',
+    'warning.legacy_vn_font': 'This file uses a legacy Vietnamese font (VNI or TCVN3), so some text may come out garbled — download the original file to keep it intact.',
+    'warning.pdf_render_budget_exceeded': 'Some PDF pages or pictures were left out to keep the result within its size budget — download the original file for everything.',
+    'warning.pdf_pages_as_images': '{count} PDF page(s) have no text layer (scans) and were kept as pictures — they cannot be edited as text.',
+    'warning.docx_images_skipped': '{count} picture(s) or equation(s) in the Word file are in a format browsers cannot draw (WMF/EMF, usually MathType) and are marked [■] — download the original file to keep them.',
+    'warning.docx_equations_converted': '{count} MathType equation(s) were converted to Word equations: the .docx download can be edited without MathType, and Copy shows them as one line of text (e.g. (x−1)/y).',
+    'warning.docx_equations_kept': '{count} embedded object(s) could not be converted and show as [■] in Copy and New Doc — the .docx download keeps them as the original objects (editing needs the program that made them, e.g. MathType).',
+    'warning.embed_failed': '{count} embedded file(s) could not be read — try the Original file button.',
+    'warning.embeds_over_limit': '{count} more embedded file(s) on this page were not read.',
     'warning.low_confidence': 'Low-confidence extraction — the result may be incomplete.',
     'warning.multi_tab_partial': 'Multi-tab doc: only the first tab was extracted.',
 
@@ -84,7 +110,7 @@ export const dict = {
     'error.sheetAccessWall': 'This spreadsheet requires access — the extension could not read it (access wall detected in the response).',
     'error.sheetNonCsvResponse': 'The spreadsheet endpoint returned a non-CSV response — the sheet may be restricted, empty, or the gviz endpoint has changed.',
     'error.extractionInProgress': 'An extraction is already in progress — wait for it to finish before starting another.',
-    'error.notADocPage': 'The active tab is not a Google Docs, Sheets, or Slides page.',
+    'error.notADocPage': 'The active tab is neither a Google Docs page nor a readable web page.',
     'error.slidesUnsupported': 'Google Slides is not supported yet.',
     'error.noExtractionTarget': 'Could not build an extraction target for this URL.',
     'error.emptyPayload': 'The content script sent an empty payload.',
@@ -95,4 +121,8 @@ export const dict = {
     'error.extractionFailed': 'Extraction failed.',
     'error.downloadFailed': 'Download failed.',
     'error.checkStatusFallback': 'Check the browser console for details.',
+    'error.pageScanFailed': 'This page cannot be read by extensions (a browser page or the Web Store?): {message}',
+    'error.embedFetchFailed': 'Could not download the embedded file (HTTP {status}).',
+    'error.embedTooLarge': 'The embedded file is too large to read ({mb} MB) — use Original file instead.',
+    'error.embedUnsupportedType': 'Embedded {type} files cannot be read yet — use Original file instead.',
 };
