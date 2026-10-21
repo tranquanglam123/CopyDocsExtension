@@ -32,3 +32,14 @@ export function downloadContent(content, filename, mimeType = 'text/plain') {
         reader.readAsDataURL(blob);
     });
 }
+
+/**
+ * A file at its own URL. The download carries the browser's cookies and
+ * needs no host permission, so it works where a fetch cannot.
+ * @param {string} url
+ * @param {string|null} filename  Null lets the server's name stand.
+ * @returns {Promise<number>} Download ID
+ */
+export function downloadUrl(url, filename) {
+    return chrome.downloads.download(filename ? { url, filename } : { url });
+}

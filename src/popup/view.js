@@ -23,6 +23,8 @@ const btnNewDoc = document.getElementById('btn-new-doc');
 const btnDownloadDocx = document.getElementById('btn-download-docx');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
 const docxImageNote = document.getElementById('docx-image-note');
+const actionsOriginal = document.getElementById('actions-original');
+const btnOriginal = document.getElementById('btn-original');
 const actionsReset = document.getElementById('actions-reset');
 const btnReset = document.getElementById('btn-reset');
 
@@ -35,6 +37,11 @@ const warningsText = document.getElementById('warnings-text');
 const chkEmbedImages = document.getElementById('chk-embed-images');
 const langSelect = document.getElementById('lang-select');
 
+const updateRow = document.getElementById('update-row');
+const updateText = document.getElementById('update-text');
+const btnUpdate = document.getElementById('btn-update');
+const appVersion = document.getElementById('app-version');
+
 /** Handles main.js needs for `addEventListener`. Every other node stays
  *  private to this module. */
 export const elements = {
@@ -43,9 +50,11 @@ export const elements = {
     btnNewDoc,
     btnDownloadDocx,
     btnDownloadTxt,
+    btnOriginal,
     btnReset,
     chkEmbedImages,
     langSelect,
+    btnUpdate,
 };
 
 // ── i18n ───────────────────────────────────────────────────────────
@@ -78,6 +87,9 @@ const WARNING_KEYS = {
     [WARNINGS.CONTAINER_NOT_FOUND]: 'warning.container_not_found',
     [WARNINGS.EMPTY_CONTENT]: 'warning.empty_content',
     [WARNINGS.IMAGE_BUDGET_EXCEEDED]: 'warning.image_budget_exceeded',
+    [WARNINGS.PAGE_ARTICLE_USED]: 'warning.page_article_used',
+    [WARNINGS.LEGACY_VN_FONT]: 'warning.legacy_vn_font',
+    [WARNINGS.PDF_RENDER_BUDGET_EXCEEDED]: 'warning.pdf_render_budget_exceeded',
     low_confidence: 'warning.low_confidence',
     multi_tab_partial: 'warning.multi_tab_partial',
 };
@@ -87,6 +99,12 @@ const WARNING_KEYS = {
 const WARNING_PREFIX_KEYS = [
     { prefix: `${WARNING_PREFIXES.IMAGE_EMBED_FAILED}:`, key: 'warning.image_embed_failed' },
     { prefix: `${WARNING_PREFIXES.IMAGE_NOT_BITMAP}:`, key: 'warning.image_not_bitmap' },
+    { prefix: `${WARNING_PREFIXES.PDF_PAGES_AS_IMAGES}:`, key: 'warning.pdf_pages_as_images' },
+    { prefix: `${WARNING_PREFIXES.DOCX_IMAGES_SKIPPED}:`, key: 'warning.docx_images_skipped' },
+    { prefix: `${WARNING_PREFIXES.DOCX_EQUATIONS_CONVERTED}:`, key: 'warning.docx_equations_converted' },
+    { prefix: `${WARNING_PREFIXES.DOCX_EQUATIONS_KEPT}:`, key: 'warning.docx_equations_kept' },
+    { prefix: `${WARNING_PREFIXES.EMBED_FAILED}:`, key: 'warning.embed_failed' },
+    { prefix: `${WARNING_PREFIXES.EMBEDS_OVER_LIMIT}:`, key: 'warning.embeds_over_limit' },
 ];
 
 /**
@@ -110,6 +128,24 @@ export function showWarnings(warnings) {
     }
     warningsText.textContent = warnings.map(warningMessage).join(' ');
     warningsBanner.classList.remove('hidden');
+}
+
+// ── Self-update ──────────────────────────────────────────────────
+
+/** @param {string} version */
+export function setVersion(version) {
+    appVersion.textContent = version ? `v${version}` : '';
+}
+
+/**
+ * @param {string|null} text  null hides the row.
+ * @param {{button?: boolean, busy?: boolean}} [opts]
+ */
+export function showUpdate(text, { button = false, busy = false } = {}) {
+    updateRow.classList.toggle('hidden', text === null);
+    updateText.textContent = text || '';
+    btnUpdate.classList.toggle('hidden', !button);
+    btnUpdate.disabled = busy;
 }
 
 // ── Embed-images toggle ────────────────────────────────────────────
@@ -192,6 +228,7 @@ export function beginExtractionUI() {
     btnExtract.disabled = true;
     progressSection.classList.remove('hidden');
     actionsExport.classList.add('hidden');
+    actionsOriginal.classList.add('hidden');
     actionsReset.classList.add('hidden');
     docxImageNote.classList.add('hidden');
     notification.classList.add('hidden');
@@ -202,6 +239,7 @@ export function beginExtractionUI() {
 export function clearResultUI() {
     progressSection.classList.add('hidden');
     actionsExport.classList.add('hidden');
+    actionsOriginal.classList.add('hidden');
     actionsReset.classList.add('hidden');
     docxImageNote.classList.add('hidden');
     notification.classList.add('hidden');
@@ -221,6 +259,7 @@ export function renderExtractionResult(data) {
     );
     showWarnings(data.meta?.warnings);
     actionsExport.classList.remove('hidden');
+    actionsOriginal.classList.toggle('hidden', !data.meta?.sourceFiles?.length);
     actionsReset.classList.remove('hidden');
     docxImageNote.classList.remove('hidden');
     btnExtract.disabled = true;
@@ -252,6 +291,14 @@ export function renderSlidesUnsupported() {
  */
 export function renderDocDetected(type, url) {
     setStatus('✅', I18n.t('popup.status.docDetected', { type: I18n.t(`docType.${type}`) }), truncateUrl(url), 'valid');
+    btnExtract.disabled = false;
+}
+
+/**
+ * @param {string} detail  What the page embeds, already worded.
+ */
+export function renderWebDetected(detail) {
+    setStatus('✅', I18n.t('popup.status.docDetected', { type: I18n.t('docType.web') }), detail, 'valid');
     btnExtract.disabled = false;
 }
 

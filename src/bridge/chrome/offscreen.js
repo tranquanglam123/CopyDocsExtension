@@ -18,8 +18,8 @@ export async function ensureDocument() {
             url: DOCUMENT_URL,
             reasons: ['DOM_PARSER'],
             justification:
-                'Parse fetched Google Docs HTML off the visible DOM so formatting can be ' +
-                'resolved through a real CSS cascade. No page scripts execute.',
+                'Parse fetched Google Docs HTML, web pages, PDF and DOCX files off the ' +
+                'visible DOM so formatting can be resolved. No page scripts execute.',
         });
     } catch (err) {
         // A concurrent call may have won the race between hasDocument() and

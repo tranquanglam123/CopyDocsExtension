@@ -8,17 +8,26 @@
  *
  * To the background — `{ action, ...payload }`, reply `{ success, ... }`:
  *
- *   CHECK_TAB           {}                        → { success, data: { isValid, type, typeLabel, url, title, docId } }
+ *   CHECK_TAB           {}                        → { success, data: { isValid, type, typeLabel, url, title, docId, embeds?, origins? } }
+ *                       `embeds` ({kind, ext, via, fileUrl}[]) and `origins` (host patterns to
+ *                       request first) are set for a `web` tab only.
  *   START_EXTRACTION    {}                        → { success, data } | { success:false, error, code?, params? }
  *   EXTRACTION_STATUS   {}                        → { success, data, status, error }
  *   DOWNLOAD            { text, filename, mimeType } → { success, downloadId }
  *   OPEN_NEW_DOC        {}                        → { success }
  *   RESET               {}                        → { success }
  *   CONTENT_READY       { data: { rawHtml, title, url, docType } } → { success }
+ *   UPDATE_STATUS       {}                        → { success, data: { current, latest, available, helper, checkedAt } }
+ *                       `helper` is whether updater/install.bat has registered the native host.
+ *   UPDATE_APPLY        {}                        → { success, data: { version } } | { success:false, error }
+ *                       The extension reloads shortly after replying.
  *
  * To the offscreen document — `{ type, ...payload }`:
  *
  *   PARSE               { html, docType }         → { ok:true, data } | { ok:false, error }
+ *   PARSE_FILE          { base64, fileType }      → { ok:true, data: { title, text, bodyHtml, warnings, ole?, docx? } } | { ok:false, error }
+ *                       `fileType` is 'pdf' or 'zip' (a .docx, checked inside).
+ *                       `docx` is the Word file rewritten with Office Math, base64.
  */
 
 /** Message names. `content/main.js` repeats CONTENT_READY as a literal —
@@ -31,5 +40,14 @@ export const MSG = Object.freeze({
     OPEN_NEW_DOC: 'openNewDoc',
     RESET: 'resetExtraction',
     CONTENT_READY: 'contentReady',
+    UPDATE_STATUS: 'updateStatus',
+    UPDATE_APPLY: 'updateApply',
     PARSE: 'parse',
+    PARSE_FILE: 'parseFile',
+});
+
+/** Scripts the background injects on demand, by extension-relative path. */
+export const CONTENT_SCRIPTS = Object.freeze({
+    /** Lists a web page's embeds and returns its HTML. */
+    SCAN: 'src/content/scan.js',
 });

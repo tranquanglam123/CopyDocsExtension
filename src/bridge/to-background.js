@@ -27,3 +27,9 @@ export const resetExtraction = () => send({ action: MSG.RESET });
  */
 export const downloadText = (text, filename, mimeType) =>
     send({ action: MSG.DOWNLOAD, text, filename, mimeType });
+
+/** @returns {Promise<{success:boolean, data?:object}>} */
+export const getUpdateStatus = () => send({ action: MSG.UPDATE_STATUS });
+
+/** @returns {Promise<{success:boolean, data?:{version:string}, error?:string}>} */
+export const applyUpdate = () => send({ action: MSG.UPDATE_APPLY });

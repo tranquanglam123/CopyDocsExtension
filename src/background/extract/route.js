@@ -2,7 +2,7 @@
  * Doc type to extraction endpoint. Kept out of lib/url.js, which stays pure
  * URL parsing; which endpoint to use is orchestration knowledge.
  */
-import { DOC_TYPES } from '../../lib/const.js';
+import { DOC_TYPES, TRANSPORTS } from '../../lib/const.js';
 import { UrlTransformer } from '../../lib/url.js';
 
 /**
@@ -13,9 +13,10 @@ import { UrlTransformer } from '../../lib/url.js';
  * - sheets → the `gviz` CSV export, fetched from the worker. `gid=0` only;
  *            the caller must surface SINGLE_SHEET_ONLY.
  * - slides → `null`. No server-rendered path exists.
+ * - web    → the tab itself; via-embed.js finds what it embeds.
  *
  * @param {string} url
- * @returns {{ url: string, parser: 'html'|'csv', mode: 'fetch'|'swFetch' } | null}
+ * @returns {{ url: string, parser: 'html'|'csv'|'embed', mode: 'fetch'|'swFetch'|'embed' } | null}
  */
 export function toExtractionTarget(url) {
     const { isValid, type } = UrlTransformer.identify(url);
@@ -40,7 +41,19 @@ export function toExtractionTarget(url) {
         case DOC_TYPES.SLIDES:
             // No reliable server-rendered path exists.
             return null;
+        case DOC_TYPES.WEB:
+            return { url, parser: 'embed', mode: TRANSPORTS.EMBED };
         default:
             return null;
     }
+}
+
+/**
+ * Google's own .docx of a document. It answers only when the owner allows
+ * downloads, which is why it is a bonus to the HTML, never the route.
+ * @param {string} docId
+ * @returns {string}
+ */
+export function toDocxExport(docId) {
+    return `https://docs.google.com/document/d/${encodeURIComponent(docId)}/export?format=docx`;
 }

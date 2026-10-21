@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>docx roundtrip</title></head>
+<body>
+<pre id="stats">running…</pre>
+<script>window.requestAnimationFrame = () => 0;</script>
+<script type="module">
+import { parseFile } from '/repo/src/offscreen/file/index.js';
+import { DocxGenerator } from '/repo/src/popup/docx.js';
+
+try {
+    const params = new URLSearchParams(location.hash.slice(1));
+    const file = params.get('file') || '/scratch/fixtures/thuvienhoclieu.docx';
+    const type = params.get('type') || 'zip';
+    const outName = params.get('out') || 'roundtrip.docx';
+    const buf = new Uint8Array(await (await fetch(file)).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    const res = await parseFile(btoa(bin), type);
+    // Same JSON trip the result takes through runtime messaging and storage.
+    const stored = JSON.parse(JSON.stringify(res));
+    // As popup/export.js: a rewritten Word file is saved as is (`html=1` forces the generator).
+    const blob = stored.docx && !params.get('html')
+        ? new Blob([Uint8Array.from(atob(stored.docx), (c) => c.charCodeAt(0))])
+        : DocxGenerator.generate(stored.bodyHtml, stored.title || 'test', { ole: stored.ole || [] });
+    await fetch('/scratch/out/' + outName, { method: 'PUT', body: blob });
+    window.__result = { ole: (stored.ole || []).length, imgs: (stored.bodyHtml.match(/<img /g) || []).length, markers: (stored.bodyHtml.match(/data-ole=/g) || []).length, size: blob.size, warnings: stored.warnings };
+} catch (err) {
+    window.__result = { error: String(err && err.stack || err) };
+}
+document.getElementById('stats').textContent = JSON.stringify(window.__result, null, 1);
+</script>
+</body>
+</html>

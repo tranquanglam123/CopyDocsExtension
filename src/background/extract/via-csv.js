@@ -27,60 +27,9 @@ export async function runSwFetchPipeline(tab, target, docId) {
     });
 
     try {
-        let response;
-        try {
-            response = await fetch(target.url, { credentials: 'include' });
-        } catch (err) {
-            throw new AppError('error.sheetNetworkFailed', { message: err.message });
-        }
-
-        // Login wall via redirect.
-        if (response.url && /accounts\.google\.com|\/ServiceLogin/i.test(response.url)) {
-            throw new AppError('error.sheetSignInRequired');
-        }
-
-        const contentType = response.headers.get('content-type') || '';
-        const bodyText = await response.text();
-
-        if (!response.ok) {
-            throw new AppError('error.sheetFetchFailed', { status: response.status });
-        }
-
-        // Denied access returns a small HTML/JS payload, not CSV. Gated on
-        // content type: a sign-in sheet legitimately contains "Sign in", so
-        // only a non-CSV response can be a wall.
-        const isCsvResponse = /text\/csv|application\/csv/i.test(contentType);
-        if (!isCsvResponse && /Sign in|You need access|Request access/i.test(bodyText)) {
-            throw new AppError('error.sheetAccessWall');
-        }
-
-        // gviz answers errors with HTML/JS and a 2xx. The CSV parser would
-        // turn that into convincing garbage.
-        if (!isCsvResponse && /^\s*(<!DOCTYPE|<html|\)\]\}')/i.test(bodyText)) {
-            throw new AppError('error.sheetNonCsvResponse');
-        }
-
-        await PipelineState.write({ phase: 'parsing' });
-
-        const rows = parseCsv(bodyText);
-        const { bodyHtml, text, charCount } = csvToHtml(rows);
-        const title = (tab.title || '').replace(/ - Google Sheets.*/i, '').trim() || 'Untitled Spreadsheet';
-        const html = wrapAsDocument(bodyHtml, title);
-
-        const result = {
-            title,
-            text,
-            html,
-            bodyHtml,
-            charCount,
-            meta: {
-                transport: TRANSPORTS.SW_FETCH,
-                docType: DOC_TYPES.SHEETS,
-                docId,
-                // gid=0 only — never silent.
-                warnings: [WARNINGS.SINGLE_SHEET_ONLY],
-            },
-        };
+        const title = (tab.title || '').replace(/ - Google Sheets.*/i, '').trim();
+        const result = await extractSheet(target, title);
+        result.meta.docId = docId;
 
         await setExtractionComplete(result, docId);
 
@@ -89,4 +38,64 @@ export async function runSwFetchPipeline(tab, target, docId) {
         // No rule, no tab touched — the slot is the only cleanup.
         await PipelineState.clear();
     }
+}
+
+/**
+ * Fetch and convert one sheet. Shared with via-embed.js, which reads Sheets
+ * embedded in web pages and owns its own pipeline state.
+ * @param {{url: string}} target
+ * @param {string} title
+ * @returns {Promise<object>}
+ */
+export async function extractSheet(target, title) {
+    let response;
+    try {
+        response = await fetch(target.url, { credentials: 'include' });
+    } catch (err) {
+        throw new AppError('error.sheetNetworkFailed', { message: err.message });
+    }
+
+    // Login wall via redirect.
+    if (response.url && /accounts\.google\.com|\/ServiceLogin/i.test(response.url)) {
+        throw new AppError('error.sheetSignInRequired');
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const bodyText = await response.text();
+
+    if (!response.ok) {
+        throw new AppError('error.sheetFetchFailed', { status: response.status });
+    }
+
+    // Denied access returns a small HTML/JS payload, not CSV. Gated on
+    // content type: a sign-in sheet legitimately contains "Sign in", so
+    // only a non-CSV response can be a wall.
+    const isCsvResponse = /text\/csv|application\/csv/i.test(contentType);
+    if (!isCsvResponse && /Sign in|You need access|Request access/i.test(bodyText)) {
+        throw new AppError('error.sheetAccessWall');
+    }
+
+    // gviz answers errors with HTML/JS and a 2xx. The CSV parser would
+    // turn that into convincing garbage.
+    if (!isCsvResponse && /^\s*(<!DOCTYPE|<html|\)\]\}')/i.test(bodyText)) {
+        throw new AppError('error.sheetNonCsvResponse');
+    }
+
+    const rows = parseCsv(bodyText);
+    const { bodyHtml, text, charCount } = csvToHtml(rows);
+    const sheetTitle = title || 'Untitled Spreadsheet';
+
+    return {
+        title: sheetTitle,
+        text,
+        html: wrapAsDocument(bodyHtml, sheetTitle),
+        bodyHtml,
+        charCount,
+        meta: {
+            transport: TRANSPORTS.SW_FETCH,
+            docType: DOC_TYPES.SHEETS,
+            // gid=0 only — never silent.
+            warnings: [WARNINGS.SINGLE_SHEET_ONLY],
+        },
+    };
 }

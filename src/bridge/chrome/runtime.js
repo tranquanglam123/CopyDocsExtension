@@ -36,6 +36,36 @@ export function onParseRequest(parseHtml) {
     });
 }
 
+/**
+ * @param {(base64: string, fileType: string) => Promise<object>} parseFile
+ */
+export function onParseFileRequest(parseFile) {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (!message || message.type !== MSG.PARSE_FILE) return undefined;
+
+        (async () => {
+            try {
+                sendResponse({ ok: true, data: await parseFile(message.base64, message.fileType) });
+            } catch (err) {
+                console.error('[offscreen] file parse failed:', err);
+                sendResponse({ ok: false, error: err?.message || String(err) });
+            }
+        })();
+
+        return true; // keep channel open for async
+    });
+}
+
+/** @returns {string} The manifest version of the running copy. */
+export function getExtensionVersion() {
+    return chrome.runtime.getManifest().version;
+}
+
+/** Restarts the extension from its files on disk, closing every page of it. */
+export function reloadExtension() {
+    chrome.runtime.reload();
+}
+
 /** Fires when the browser starts or the extension is installed/updated. */
 export function onStartupOrInstall(handler) {
     chrome.runtime.onStartup.addListener(() => handler('onStartup'));

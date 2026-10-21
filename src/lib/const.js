@@ -32,6 +32,8 @@ export const LOCAL_KEYS = Object.freeze({
      * session-scoped.
      */
     LAST_EXTRACTION: 'lastExtraction',
+    /** The last update check, from background/update.js. */
+    UPDATE_INFO: 'updateInfo',
 });
 
 // ─── Extraction status values ───────────────────────────────────────────────
@@ -80,6 +82,12 @@ export const WARNINGS = Object.freeze({
     EMPTY_CONTENT: 'empty_content',
     /** Image embedding stopped because the byte budget was exhausted. */
     IMAGE_BUDGET_EXCEEDED: 'image_budget_exceeded',
+    /** A web page held no embedded file, so its article text was used. */
+    PAGE_ARTICLE_USED: 'page_article_used',
+    /** A legacy VNI/TCVN3 font was found; its text may read as garbage. */
+    LEGACY_VN_FONT: 'legacy_vn_font',
+    /** The page image budget ran out before every page was rendered. */
+    PDF_RENDER_BUDGET_EXCEEDED: 'pdf_render_budget_exceeded',
 });
 
 /** Warning codes that carry a `:<count>` suffix. */
@@ -88,6 +96,18 @@ export const WARNING_PREFIXES = Object.freeze({
     IMAGE_EMBED_FAILED: 'image_embed_failed',
     /** A source did not return `image/*`; the original URL was kept. */
     IMAGE_NOT_BITMAP: 'image_not_bitmap',
+    /** PDF pages with no text layer (scans), rendered as pictures. */
+    PDF_PAGES_AS_IMAGES: 'pdf_pages_as_images',
+    /** DOCX pictures a browser cannot draw (WMF/EMF), and not kept either. */
+    DOCX_IMAGES_SKIPPED: 'docx_images_skipped',
+    /** MathType equations converted to Office Math for the .docx export. */
+    DOCX_EQUATIONS_CONVERTED: 'docx_equations_converted',
+    /** OLE objects not converted: [■] in Copy, kept whole in the .docx export. */
+    DOCX_EQUATIONS_KEPT: 'docx_equations_kept',
+    /** Embedded files on the page that could not be read. */
+    EMBED_FAILED: 'embed_failed',
+    /** Embeds past FILE_LIMITS.MAX_EMBEDS, left unread. */
+    EMBEDS_OVER_LIMIT: 'embeds_over_limit',
 });
 
 // ─── Alarms ─────────────────────────────────────────────────────────────────
@@ -95,13 +115,37 @@ export const WARNING_PREFIXES = Object.freeze({
 export const ALARMS = Object.freeze({
     /** Reaps pipelines abandoned by a terminated service worker. */
     PIPELINE_WATCHDOG: 'pipelineWatchdog',
+    /** Asks GitHub for a newer release. */
+    UPDATE_CHECK: 'updateCheck',
+});
+
+// ─── Self-update ────────────────────────────────────────────────────────────
+// Copies loaded unpacked have no Web Store to update them: a GitHub Release
+// says what is newest, and the native helper in updater/ installs it.
+
+export const UPDATE = Object.freeze({
+    REPO: 'tranquanglam123/CopyDocsExtension',
+    /** The release asset installed; tools/release/release.mjs uploads it. */
+    ASSET: 'CopyDocExt.zip',
+    /** Native messaging host name; updater/install.ps1 registers it. */
+    HOST: 'com.copydocext.updater',
+    /** A popup opening later than this asks GitHub again. */
+    CHECK_MAX_AGE_MS: 6 * 60 * 60 * 1000,
+    CHECK_PERIOD_MINUTES: 12 * 60,
+    PING_TIMEOUT_MS: 15_000,
+    /** Download, unpack and copy; the helper has its own network timeouts. */
+    INSTALL_TIMEOUT_MS: 5 * 60_000,
+    /** Lets the reply reach the popup before the reload closes it. */
+    RELOAD_DELAY_MS: 1_500,
+    BADGE: '↑',
 });
 
 // ─── Timing and limits ──────────────────────────────────────────────────────
 
 export const TIMING = Object.freeze({
-    /** A pipeline older than this is abandoned and force-recovered. */
-    PIPELINE_TIMEOUT_MS: 60_000,
+    /** A pipeline older than this is abandoned and force-recovered. Rendering
+     *  a scanned PDF page by page is the slowest path. */
+    PIPELINE_TIMEOUT_MS: 120_000,
     /** Close the offscreen document after this much idle time. */
     OFFSCREEN_IDLE_CLOSE_MS: 30_000,
     /** Give up waiting for the sandboxed iframe to load. */
@@ -123,6 +167,30 @@ export const IMAGE_LIMITS = Object.freeze({
     TIMEOUT_MS: 8_000,
 });
 
+/** Files embedded in web pages: PDF, DOCX. */
+export const FILE_LIMITS = Object.freeze({
+    /** Base64 inflates this by a third on its way to the offscreen document. */
+    MAX_BYTES: 30 * 1024 * 1024,
+    /** Embeds read from one page; the rest are listed, not extracted. */
+    MAX_EMBEDS: 5,
+    TIMEOUT_MS: 45_000,
+    /** Google's .docx export, tried alongside the HTML; shorter, as it is optional. */
+    EXPORT_TIMEOUT_MS: 20_000,
+    /** Pages rendered to pictures (scans, figures) per PDF. */
+    MAX_RENDERED_PAGES: 40,
+    /** JPEG bytes across every rendered page or crop of one PDF. */
+    RENDER_BUDGET_BYTES: 12 * 1024 * 1024,
+});
+
+/**
+ * Relationship ids in a kept OLE object's XML (offscreen/file/docx.js), swapped
+ * for real ones by popup/docx.js when it writes the .docx.
+ */
+export const OLE_PLACEHOLDERS = Object.freeze({
+    BIN_RID: '__OLE_BIN_RID__',
+    PREVIEW_RID: '__OLE_PREVIEW_RID__',
+});
+
 /** Above this, the computed-style fill is skipped. */
 export const STYLE_FILL_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -132,6 +200,22 @@ export const DOC_TYPES = Object.freeze({
     DOCS: 'docs',
     SHEETS: 'sheets',
     SLIDES: 'slides',
+    /** Any other http(s) page: its embedded files, or its article. */
+    WEB: 'web',
+});
+
+// ─── Embeds on web pages ────────────────────────────────────────────────────
+
+/** What lib/embed.js found behind an iframe, link or object. */
+export const EMBED_KINDS = Object.freeze({
+    /** A binary file (PDF or DOCX), told apart by its bytes once fetched. */
+    FILE: 'file',
+    /** A Google Doc by id: the existing /mobilebasic path. */
+    GDOC: 'gdoc',
+    /** A Google Sheet by id: the existing gviz CSV path. */
+    GSHEET: 'gsheet',
+    /** A server-rendered HTML page, e.g. a Doc published to the web. */
+    HTML: 'html',
 });
 
 // ─── Transport tiers ────────────────────────────────────────────────────────
@@ -140,4 +224,6 @@ export const TRANSPORTS = Object.freeze({
     SW_FETCH: 'swFetch',
     CS_FETCH: 'csFetch',
     TAB_NAV: 'tabNav',
+    /** Web page: files found in the tab, fetched and parsed per kind. */
+    EMBED: 'embed',
 });

@@ -1,6 +1,7 @@
 /**
- * The only `chrome.scripting.executeScript` call site. Both csFetch tiers
- * need a same-origin fetch inside the tab's own page context.
+ * The only `chrome.scripting.executeScript` call sites. The csFetch tiers
+ * need a same-origin fetch inside the tab's own page context; the web path
+ * needs content/scan.js run against the live DOM.
  */
 
 /**
@@ -18,6 +19,20 @@ export async function executeInTab(tabId, func, args) {
         target: { tabId },
         func,
         args,
+    });
+    return injectionResults?.[0]?.result;
+}
+
+/**
+ * Inject an extension script file; its last expression is the result.
+ * @param {number} tabId
+ * @param {string} file  Extension-relative path, from CONTENT_SCRIPTS.
+ * @returns {Promise<any>}
+ */
+export async function executeFileInTab(tabId, file) {
+    const injectionResults = await chrome.scripting.executeScript({
+        target: { tabId },
+        files: [file],
     });
     return injectionResults?.[0]?.result;
 }

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>parser harness</title>
+<style>body{font-family:Arial;max-width:900px;margin:10px auto} #out{border:1px solid #ccc;padding:8px} td{border:1px solid #ccc}</style>
+</head>
+<body>
+<pre id="stats">running…</pre>
+<div id="out"></div>
+<script>
+// Stand-in for a hidden offscreen document: rAF never fires.
+window.requestAnimationFrame = () => 0;
+</script>
+<script type="module">
+import { parseFile } from '/repo/src/offscreen/file/index.js';
+
+const params = new URLSearchParams(location.hash.slice(1));
+const file = params.get('file');
+const type = params.get('type');
+const t0 = performance.now();
+try {
+    const buf = new Uint8Array(await (await fetch(file)).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    const res = await parseFile(btoa(bin), type);
+    const ms = Math.round(performance.now() - t0);
+    window.__result = { ms, title: res.title, textLen: res.text.length, htmlLen: res.bodyHtml.length, warnings: res.warnings,
+        imgs: (res.bodyHtml.match(/<img /g) || []).length, paras: (res.bodyHtml.match(/<(p|h\d)[ >]/g) || []).length,
+        textHead: res.text.slice(0, 1500) };
+    document.getElementById('stats').textContent = JSON.stringify({ ...window.__result, textHead: undefined }, null, 1);
+    document.getElementById('out').innerHTML = res.bodyHtml;
+} catch (err) {
+    window.__result = { error: String(err && err.stack || err) };
+    document.getElementById('stats').textContent = window.__result.error;
+}
+</script>
+</body>
+</html>

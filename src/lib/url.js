@@ -1,4 +1,4 @@
-/** Google Docs/Sheets/Slides URL parsing. */
+/** Google Docs/Sheets/Slides URL parsing, with every other http(s) page as `web`. */
 export class UrlTransformer {
 
   /** Regex patterns for Google Workspace document URLs */
@@ -8,19 +8,26 @@ export class UrlTransformer {
     slides: /^https:\/\/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/,
   };
 
+  /** Learning material is mostly embedded in ordinary pages; those are `web`. */
+  static WEB_PATTERN = /^https?:\/\/[^/]+/i;
+
   /**
-   * Check whether a URL points to a Google Doc, Sheet, or Slide.
+   * Google Doc, Sheet or Slide first; any other http(s) page is `web`.
+   * `/d/e/<id>` is a published copy, not a document id, so it is `web` too.
    * @param {string} url
    * @returns {{ isValid: boolean, type: string|null }}
    */
   static identify(url) {
     if (!url) return { isValid: false, type: null };
 
-    for (const [type, pattern] of Object.entries(UrlTransformer.PATTERNS)) {
-      if (pattern.test(url)) {
-        return { isValid: true, type };
+    if (!/^https:\/\/docs\.google\.com\/[a-z]+\/d\/e\//.test(url)) {
+      for (const [type, pattern] of Object.entries(UrlTransformer.PATTERNS)) {
+        if (pattern.test(url)) {
+          return { isValid: true, type };
+        }
       }
     }
+    if (UrlTransformer.WEB_PATTERN.test(url)) return { isValid: true, type: 'web' };
     return { isValid: false, type: null };
   }
 
@@ -30,7 +37,8 @@ export class UrlTransformer {
    * @returns {boolean}
    */
   static isGoogleDoc(url) {
-    return UrlTransformer.identify(url).isValid;
+    const { type } = UrlTransformer.identify(url);
+    return type !== null && type !== 'web';
   }
 
   /**
@@ -39,11 +47,11 @@ export class UrlTransformer {
    * @returns {string|null}
    */
   static getDocId(url) {
-    for (const pattern of Object.values(UrlTransformer.PATTERNS)) {
-      const match = url?.match(pattern);
-      if (match) return match[1];
-    }
-    return null;
+    const { type } = UrlTransformer.identify(url);
+    if (type === null) return null;
+    // A page has no id; its address without the fragment is one.
+    if (type === 'web') return url.split('#')[0];
+    return url.match(UrlTransformer.PATTERNS[type])[1];
   }
 
   /**
@@ -53,7 +61,7 @@ export class UrlTransformer {
    */
   static getTypeLabel(url) {
     const { type } = UrlTransformer.identify(url);
-    const labels = { docs: 'Google Doc', sheets: 'Google Sheet', slides: 'Google Slides' };
+    const labels = { docs: 'Google Doc', sheets: 'Google Sheet', slides: 'Google Slides', web: 'Web page' };
     return labels[type] || 'Unknown';
   }
 }

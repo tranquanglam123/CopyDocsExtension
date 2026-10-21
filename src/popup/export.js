@@ -5,7 +5,7 @@
 
 import { DocxGenerator } from './docx.js';
 import { I18n } from '../lib/i18n/index.js';
-import { downloadDataUrl } from '../bridge/chrome/downloads.js';
+import { downloadDataUrl, downloadUrl } from '../bridge/chrome/downloads.js';
 import { downloadText } from '../bridge/to-background.js';
 
 // ── Copy with formatting ─────────────────────────────────────────
@@ -58,10 +58,16 @@ function legacyCopy(text) {
  * @param {string} bodyHtml
  * @param {string} title
  * @param {string} filename
+ * @param {object[]} [ole]  MathType equations bodyHtml marks with `data-ole`.
+ * @param {string} [docx]  The source Word file, base64, when that is what
+ *   was read: it is saved as is, so nothing of its formatting is lost.
  * @returns {Promise<number>} the chrome.downloads download id.
  */
-export async function downloadDocx(bodyHtml, title, filename) {
-    const blob = DocxGenerator.generate(bodyHtml, title);
+export async function downloadDocx(bodyHtml, title, filename, ole = [], docx = '') {
+    if (docx) {
+        return downloadDataUrl(`data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${docx}`, filename);
+    }
+    const blob = DocxGenerator.generate(bodyHtml, title, { ole });
     return downloadDataUrl(await blobToDataUrl(blob), filename);
 }
 
@@ -79,6 +85,20 @@ export async function downloadTxt(text, filename, mimeType = 'text/plain') {
     const resp = await downloadText(text, filename, mimeType);
     if (!resp?.success) {
         throw new Error(resp?.error || I18n.t('error.downloadFailed'));
+    }
+}
+
+// ── Download original files ─────────────────────────────────────
+
+/**
+ * The files a web page embedded, straight from their URLs. Chrome's own
+ * download carries the cookies, so this works where the fetch could not.
+ * @param {Array<{url: string, name: string|null}>} files
+ */
+export async function downloadOriginals(files) {
+    for (const file of files) {
+        const name = file.name ? file.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_') : null;
+        await downloadUrl(file.url, name);
     }
 }
 

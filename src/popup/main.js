@@ -13,9 +13,11 @@ view.elements.btnCopy.addEventListener('click', controller.handleCopy);
 view.elements.btnNewDoc.addEventListener('click', controller.handleNewDoc);
 view.elements.btnDownloadDocx.addEventListener('click', controller.handleDownloadDocx);
 view.elements.btnDownloadTxt.addEventListener('click', controller.handleDownloadTxt);
+view.elements.btnOriginal.addEventListener('click', controller.handleDownloadOriginal);
 view.elements.btnReset.addEventListener('click', controller.handleReset);
 view.elements.chkEmbedImages.addEventListener('change', controller.handleEmbedImagesChange);
 view.elements.langSelect.addEventListener('change', controller.handleLanguageChange);
+view.elements.btnUpdate.addEventListener('click', controller.handleUpdate);
 
 // ── Boot ─────────────────────────────────────────────────────────
 // First, so nothing renders untranslated even for an instant.
@@ -23,3 +25,4 @@ view.elements.langSelect.addEventListener('change', controller.handleLanguageCha
 await controller.initI18n();
 controller.initEmbedImagesToggle();
 controller.init();
+controller.initUpdate();

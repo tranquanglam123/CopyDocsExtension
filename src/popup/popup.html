@@ -171,6 +171,21 @@
 
     </section>
 
+    <!-- Web pages only: the PDF/Word file the page embeds, as published. -->
+    <section id="actions-original" class="actions hidden">
+      <button id="btn-original" class="btn btn-accent" data-i18n-title="popup.action.originalTitle"
+        title="Download the original PDF/Word file — keeps equations and layout exactly">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <polyline points="9 14 12 17 15 14" />
+          <line x1="12" y1="17" x2="12" y2="11" />
+        </svg>
+        <span data-i18n="popup.action.original">Original file</span>
+      </button>
+    </section>
+
     <!-- A finished result stays in session storage. Without this the popup
          would keep showing it and never offer the next document. -->
     <section id="actions-reset" class="actions hidden">
@@ -191,8 +206,17 @@
          download. Stated up front rather than left for the user to
          discover. -->
     <p id="docx-image-note" class="docx-image-note hidden" data-i18n="popup.docxNote">
-      Note: images aren't included in .docx downloads yet — use Copy or New Doc to keep them.
+      Note: only embedded pictures reach the .docx — keep "Embed images" on before extracting.
     </p>
+
+    <!-- A newer GitHub release, from background/update.js. The button shows
+         only once updater/install.bat has set up the helper that installs it. -->
+    <section id="update-row" class="card update-row hidden">
+      <span id="update-text" class="update-text"></span>
+      <button id="btn-update" class="btn btn-accent btn-update hidden">
+        <span data-i18n="popup.update.action">Update</span>
+      </button>
+    </section>
 
     <!-- Notification banner -->
     <div id="notification" class="notification hidden">
@@ -206,7 +230,7 @@
          for a language picker, so a user who picked the wrong language by
          accident can still recognize their own. -->
     <footer class="popup-footer">
-      <span>v2.0.0</span>
+      <span id="app-version"></span>
       <select id="lang-select" class="lang-select" data-i18n-aria-label="popup.footer.languageLabel"
         aria-label="Language">
         <option value="en">English</option>

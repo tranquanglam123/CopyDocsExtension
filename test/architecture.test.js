@@ -95,6 +95,17 @@ describe('chrome access', () => {
             'content/main.js imports — MV3 content scripts are not ES modules'
         );
     });
+
+    test('every injected content script exists and is a plain script too', () => {
+        const contract = read('src/bridge/contract.js');
+        const block = contract.match(/CONTENT_SCRIPTS = Object\.freeze\(\{([\s\S]*?)\}\)/)?.[1] || '';
+        const files = [...block.matchAll(/'(src\/content\/[^']+\.js)'/g)].map((m) => m[1]);
+        assert.ok(files.length > 0, 'CONTENT_SCRIPTS lists no file');
+        for (const file of files) {
+            assert.ok(existsSync(join(ROOT, file)), `${file} is in CONTENT_SCRIPTS but missing`);
+            assert.ok(!/^\s*(import|export)\s/m.test(code(read(file))), `${file} is a module — executeScript files are not`);
+        }
+    });
 });
 
 // ─── 2. DOM access follows the realm ────────────────────────────────────────
@@ -195,7 +206,7 @@ describe('no duplicated concepts', () => {
         // match prose.
         const guarded = [
             'embedImagesEnabled', 'uiLanguage', 'ruleAlloc',
-            'pipelineWatchdog',
+            'pipelineWatchdog', 'updateCheck', 'updateInfo',
             'single_sheet_only', 'image_not_bitmap', 'image_embed_failed',
             'style_fill_skipped_size', 'image_budget_exceeded', 'tabnav_fallback',
         ];
@@ -216,7 +227,7 @@ describe('no duplicated concepts', () => {
     test('message names are literals only in bridge/contract.js', () => {
         const guarded = [
             'checkTab', 'startExtraction', 'getExtractionStatus',
-            'openNewDoc', 'contentReady',
+            'openNewDoc', 'contentReady', 'updateStatus', 'updateApply',
         ];
         const exempt = new Set(['src/bridge/contract.js', CONTENT_ENTRY]);
 
