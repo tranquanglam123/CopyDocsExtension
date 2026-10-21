@@ -131,7 +131,9 @@ export const UPDATE = Object.freeze({
     HOST: 'com.copydocext.updater',
     /** A popup opening later than this asks GitHub again. */
     CHECK_MAX_AGE_MS: 6 * 60 * 60 * 1000,
-    CHECK_PERIOD_MINUTES: 12 * 60,
+    /** Shorter while nothing newer is known, so a fresh release shows up soon. */
+    CHECK_IDLE_MAX_AGE_MS: 60 * 60 * 1000,
+    CHECK_PERIOD_MINUTES: 3 * 60,
     PING_TIMEOUT_MS: 15_000,
     /** Download, unpack and copy; the helper has its own network timeouts. */
     INSTALL_TIMEOUT_MS: 5 * 60_000,

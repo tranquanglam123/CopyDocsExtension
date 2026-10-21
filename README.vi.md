@@ -45,6 +45,8 @@ Tiện ích nạp ở chế độ developer, không qua Chrome Web Store. Làm m
 
 Chỉ chạy trên Windows (Chrome và Edge). Thư mục là bản clone git thì trình cập nhật từ chối — cập nhật bằng `git pull`.
 
+**Không thấy nút Cập nhật?** Bản mới hiện sau khoảng một giờ kể từ lúc mở popup. Nếu popup có dòng nhắc cài đặt cập nhật, nghĩa là chưa chạy `updater\install.bat` — chạy một lần rồi mở lại popup.
+
 ## Cách dùng
 
 1. Mở một Google Doc hoặc Sheet bị khóa, hoặc một trang web có học liệu

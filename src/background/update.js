@@ -38,7 +38,8 @@ export async function checkForUpdate() {
  */
 export async function getUpdateStatus() {
     const stored = await getUpdateInfo();
-    if (!needsCheck(stored, getExtensionVersion(), Date.now(), UPDATE.CHECK_MAX_AGE_MS)) {
+    const maxAge = stored?.available ? UPDATE.CHECK_MAX_AGE_MS : UPDATE.CHECK_IDLE_MAX_AGE_MS;
+    if (!needsCheck(stored, getExtensionVersion(), Date.now(), maxAge)) {
         // install.bat may have run since; it needs no reload to take effect.
         if (stored.available && !stored.helper && await pingHelper()) {
             stored.helper = true;

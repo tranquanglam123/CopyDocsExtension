@@ -45,7 +45,9 @@ The extension loads in developer mode, not from the Chrome Web Store. Once per P
 
 Windows only (Chrome and Edge). The updater refuses a git checkout — use `git pull` there.
 
-**Publishing a release:** raise `version` in `manifest.json`, commit, push, then run `node tools/release/release.mjs` (needs `gh` signed in). It tags `v<version>` and uploads `CopyDocExt.zip`; installed copies see it within 12 hours.
+**No Update button?** A new release shows up within about an hour of opening the popup. A line saying to set up updates means `updater\install.bat` hasn't been run yet — run it once, then reopen the popup.
+
+**Publishing a release:** raise `version` in `manifest.json`, commit, push, then run `node tools/release/release.mjs` (needs `gh` signed in). It tags `v<version>` and uploads `CopyDocExt.zip`; installed copies see it within a few hours.
 
 ## Use
 
