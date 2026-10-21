@@ -36,7 +36,15 @@ the architecture tests never scan it. Upgrade it whole; never edit it.
   file's OLE objects, marked `data-ole` in the HTML, for `popup/docx.js`:
   MathType equations converted to Office Math (`lib/cfb.js` → `lib/mtef.js`
   → `lib/math-render.js`), anything else kept whole; `lib/const.js` holds
-  the shared relationship-id placeholders.
+  the shared relationship-id placeholders. When the page's only content is
+  one Word file, the `.docx` download is that file itself (`docx` in the
+  result), rewritten with the same equations as Office Math; `popup/docx.js`
+  writes every other source from its HTML and inline styles. The PDF parser
+  reads each page's geometry and `lib/pdf-layout.js` rebuilds it: tables
+  from rules (`lib/pdf-table.js`), equations as Office Math
+  (`lib/pdf-math.js`, marked `data-ole` like the DOCX ones), one
+  `<section data-page>` per page, which `popup/docx.js` writes as a Word
+  section; what cannot be rebuilt is cropped from the rendered page.
 - **`content/`** — `main.js` is readiness detection only and returns raw
   HTML. `scan.js` is injected on demand into a web page, lists its embeds
   and returns its HTML; like `main.js` it is a plain script, not a module.

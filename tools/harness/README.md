@@ -28,7 +28,14 @@ writes `WORK/out/<name>`. Port 8765 is blocked on this machine; 18931 works.
   — parse, JSON round trip (as storage does), `DocxGenerator`, PUT the
   .docx to `WORK/out/`. Change `?v=` after editing: the tab caches modules.
 
-Both disable `requestAnimationFrame`, as the hidden offscreen document does.
+- `/repo/tools/harness/harness-pdf.html?v=N#file=/scratch/fixtures/x.pdf&from=7&to=8&png=1`
+  — each PDF page beside the section `lib/pdf-layout.js` rebuilt from it,
+  at the section's size and margins; PUTs the .docx (`out=`, default
+  `pdf.docx`) and, with `png=1`, `WORK/out/pageN.png` of each pair. Read
+  the PNGs: a screenshot of the long page times out. Equations show as
+  their linear text, as in the popup.
+
+All three disable `requestAnimationFrame`, as the hidden offscreen document does.
 The Chrome automation tool refuses to return text that looks like a URL or
 query string, so read results as numbers, or render them into the page and
 take a screenshot.
@@ -36,11 +43,16 @@ take a screenshot.
 ## Checks
 
 ```
+python -I tools/harness/check_docx.py WORK/out/pdf.docx
 python -I tools/harness/validate_docx.py WORK/out/name.docx WORK/fixtures/source.docx
 node tools/harness/mtef_dump.mjs <repo> <unzipped-docx>/word/embeddings WORK/out/eq.json
 python -I tools/harness/mtef_check.py WORK/out/eq.json <unzipped-docx>/word
 ```
 
+`check_docx.py` checks a generated file on its own: every part parses,
+every relationship resolves, run, paragraph and cell properties come in
+schema order, each table row spans its grid, and section properties sit
+only in a paragraph or at the end of the body.
 `validate_docx.py` checks the package (XML, relationships, content types)
 and that kept OLE objects are byte-identical to the source. `mtef_check.py`
 checks every converted equation's OMML parses and that its letters and

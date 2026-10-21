@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>pdf layout</title>
+<style>
+  body { margin: 0; background: #888; font-family: 'Times New Roman'; }
+  .row { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  .pdf, section { background: #fff; flex: none; }
+  section { box-sizing: border-box; position: relative; overflow: hidden; }
+  section p { margin: 0; }
+  section table { border-collapse: collapse; }
+  img[data-float] { position: absolute; }
+  #stats { color: #fff; padding: 8px; }
+</style>
+</head>
+<body>
+<pre id="stats">running…</pre>
+<div id="out"></div>
+<script>window.requestAnimationFrame = () => 0;</script>
+<script type="module">
+// Each PDF page beside the section lib/pdf-layout.js rebuilt from it, drawn
+// at the section's own size and margins, and the .docx DocxGenerator writes.
+const v = location.search.slice(1);
+const params = new URLSearchParams(location.hash.slice(1));
+// Nested imports come from the HTTP cache: refresh the ones being edited.
+for (const m of ['lib/pdf-layout.js', 'lib/pdf-math.js', 'lib/pdf-table.js', 'offscreen/file/pdf.js', 'offscreen/file/index.js', 'popup/docx.js']) {
+    await fetch('/repo/src/' + m, { cache: 'reload' });
+}
+const pdfjs = await import('/repo/src/vendor/pdfjs/pdf.min.mjs');
+const { parseFile } = await import('/repo/src/offscreen/file/index.js?' + v);
+const { DocxGenerator } = await import('/repo/src/popup/docx.js?' + v);
+
+const file = params.get('file');
+const buf = new Uint8Array(await (await fetch(file)).arrayBuffer());
+let bin = '';
+for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+const started = performance.now();
+const res = await parseFile(btoa(bin), 'pdf');
+const ms = Math.round(performance.now() - started);
+
+// Same JSON trip the result takes through runtime messaging and storage.
+const stored = JSON.parse(JSON.stringify(res));
+const blob = DocxGenerator.generate(stored.bodyHtml, stored.title || 'test', { ole: stored.ole || [] });
+await fetch('/scratch/out/' + (params.get('out') || 'pdf.docx'), { method: 'PUT', body: blob });
+
+const holder = document.createElement('div');
+holder.innerHTML = res.bodyHtml;
+const sections = [...holder.querySelectorAll(':scope > section')];
+const doc = await pdfjs.getDocument({ data: buf, isEvalSupported: false, useSystemFonts: true, wasmUrl: '/repo/src/vendor/pdfjs/wasm/', verbosity: 0 }).promise;
+const from = Number(params.get('from') || 1);
+const to = Math.min(sections.length, Number(params.get('to') || sections.length));
+const css = document.querySelector('style').textContent;
+
+for (let n = from; n <= to; n++) {
+    const section = sections[n - 1];
+    const [w, h] = section.dataset.page.split(' ').map(Number);
+    const [mt, mr, mb, ml] = section.dataset.margins.split(' ').map(Number);
+    section.style.cssText = `width:${w}pt;height:${h}pt;padding:${mt}pt ${mr}pt ${mb}pt ${ml}pt`;
+    for (const img of section.querySelectorAll('img[data-float]')) {
+        const [x, y] = img.dataset.float.split(' ').map(Number);
+        img.style.left = `${x}pt`;
+        img.style.top = `${y}pt`;
+    }
+
+    const page = await doc.getPage(n);
+    const viewport = page.getViewport({ scale: 96 / 72 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.className = 'pdf';
+    await page.render({ canvas, viewport, intent: 'print' }).promise;
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.style.zoom = params.get('zoom') || 0.62;
+    row.append(canvas, section);
+    document.getElementById('out').append(row);
+
+    if (params.get('png')) {
+        // Both side by side as WORK/out/pageN.png: screenshots of a long page time out.
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}"><foreignObject width="100%" height="100%">` +
+            `<div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${new XMLSerializer().serializeToString(section)}</div></foreignObject></svg>`;
+        const img = new Image();
+        await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+        const both = document.createElement('canvas');
+        both.width = canvas.width * 2 + 10;
+        both.height = canvas.height;
+        const g = both.getContext('2d');
+        g.fillStyle = '#888';
+        g.fillRect(0, 0, both.width, both.height);
+        g.drawImage(canvas, 0, 0);
+        g.drawImage(img, canvas.width + 10, 0);
+        const png = await new Promise((resolve) => both.toBlob(resolve, 'image/png'));
+        await fetch(`/scratch/out/page${n}.png`, { method: 'PUT', body: png });
+    }
+}
+document.getElementById('stats').textContent = JSON.stringify({ ms, pages: sections.length, ole: res.ole.length, size: blob.size, warnings: res.warnings });
+</script>
+</body>
+</html>

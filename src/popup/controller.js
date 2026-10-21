@@ -333,7 +333,7 @@ export async function handleDownloadDocx() {
     const filename = exportsApi.sanitizeFilename(extractedData.title || currentDocTitle) + '.docx';
 
     try {
-        await exportsApi.downloadDocx(extractedData.bodyHtml, extractedData.title || currentDocTitle, filename, extractedData.ole);
+        await exportsApi.downloadDocx(extractedData.bodyHtml, extractedData.title || currentDocTitle, filename, extractedData.ole, extractedData.docx);
         view.showNotification(I18n.t('popup.notify.docxDownloading', { filename }), 'success');
     } catch (err) {
         console.error('[Popup] DOCX generation error:', err);

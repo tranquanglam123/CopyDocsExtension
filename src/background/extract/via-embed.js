@@ -16,6 +16,8 @@ import { fetchFile } from './binary.js';
 import { embedImagesIntoResult } from './image.js';
 import { toExtractionTarget } from './route.js';
 import { extractSheet } from './via-csv.js';
+import { fetchDocxExport } from './via-fetch.js';
+import { UrlTransformer } from '../../lib/url.js';
 import { PipelineState } from './state.js';
 
 /**
@@ -112,6 +114,9 @@ export async function runEmbedPipeline(tab, target, docId) {
             charCount: text.length,
             // MathType equations for popup/docx.js, by their data-ole index.
             ...(ole.length > 0 ? { ole } : {}),
+            // One Word file (or exportable Google Doc) and nothing else: the
+            // .docx download is that file.
+            ...(read.length === 1 && read[0].docx ? { docx: read[0].docx } : {}),
             meta: {
                 transport: TRANSPORTS.EMBED,
                 docType: DOC_TYPES.WEB,
@@ -136,16 +141,18 @@ export async function runEmbedPipeline(tab, target, docId) {
 /**
  * @param {object} embed  From lib/embed.js.
  * @param {{id: number, url: string}} tab
- * @returns {Promise<{title: string, bodyHtml: string, text: string, warnings: string[], ole?: object[]}>}
+ * @returns {Promise<{title: string, bodyHtml: string, text: string, warnings: string[], ole?: object[], docx?: string}>}
  */
 async function extractEmbed(embed, tab) {
     switch (embed.kind) {
         case EMBED_KINDS.GDOC: {
             // Cross-origin to the tab, so the worker tier alone; docs.google.com
             // is a manifest host.
+            const exported = fetchDocxExport(UrlTransformer.getDocId(embed.fileUrl));
             const { html } = await fetchDocHtml({ url: toExtractionTarget(embed.fileUrl).url, tabId: null });
             const parsed = await embedImagesIntoResult(await parse(html, DOC_TYPES.DOCS), null);
-            return fromParsed(parsed);
+            const docx = await exported;
+            return { ...fromParsed(parsed), ...(docx ? { docx } : {}) };
         }
         case EMBED_KINDS.GSHEET:
             return fromParsed(await extractSheet(toExtractionTarget(embed.fileUrl), ''));
@@ -181,6 +188,8 @@ async function extractFile(embed, tab) {
         text: parsed.text,
         warnings: parsed.warnings || [],
         ole: parsed.ole || [],
+        // A Word file is exported as itself, MathType swapped for Office Math.
+        ...(type === 'zip' ? { docx: parsed.docx || file.base64 } : {}),
     };
 }
 

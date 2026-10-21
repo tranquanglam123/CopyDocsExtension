@@ -47,3 +47,13 @@ export function toExtractionTarget(url) {
             return null;
     }
 }
+
+/**
+ * Google's own .docx of a document. It answers only when the owner allows
+ * downloads, which is why it is a bonus to the HTML, never the route.
+ * @param {string} docId
+ * @returns {string}
+ */
+export function toDocxExport(docId) {
+    return `https://docs.google.com/document/d/${encodeURIComponent(docId)}/export?format=docx`;
+}

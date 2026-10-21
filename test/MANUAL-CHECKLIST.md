@@ -250,12 +250,14 @@ Reload the unpacked extension first: the manifest gained
 | # | Open | Expect |
 |---|---|---|
 | E1 | `https://thcs.toanmath.com/2026/05/de-cuoi-ki-2-toan-8-nam-2025-2026-truong-thcs-le-thien-hai-phong.html` | Popup: "Embedded: PDF". Extract: no permission prompt (same origin), ~25k characters, `legacy_vn_font` warning, **Original file** downloads the PDF. |
-| E2 | A thuvienhoclieu.com post with an Office Online viewer | "Embedded: Word". Result has headings and bold; MathType equations show as one line of text (e.g. `(x−1)/y`) with the `docx_equations_converted` warning. The **.docx** download opens in Word with every equation in place as a Word equation, editable without MathType. |
+| E2 | A thuvienhoclieu.com post with an Office Online viewer | "Embedded: Word". Result has headings and bold; MathType equations show as one line of text (e.g. `(x−1)/y`) with the `docx_equations_converted` warning. The **.docx** download is the source file itself: same fonts, sizes, margins, tables, headers and footers, with every equation in place as a Word equation, editable without MathType. |
 | E3 | A page embedding `drive.google.com/file/d/…/preview` | Extract asks for drive.google.com access once. Declining still extracts the page article with `embed_failed:1`. |
 | E4 | A plain article page with no embeds | "No embedded file found"; result is the article with `page_article_used`. |
 | E5 | A `.pdf` opened directly in a tab | Detected; permission prompt for that host; PDF text extracted. |
 | E6 | A scanned (image-only) PDF | Pages come back as pictures with `pdf_pages_as_images:<n>`. |
 | E7 | `chrome://extensions` | "Nothing to extract here", Extract disabled. |
+| E8 | A Google Doc whose owner allows downloads | The **.docx** download is Google's own export: identical to File > Download > .docx. With downloads disabled it is written from the HTML instead: A4, the Doc's fonts, sizes and colours, merged table cells, real numbered lists. |
+| E9 | E1's PDF, **.docx** download | Open in Word, beside the PDF: 24 pages, each the PDF's size and orientation (pages 1–6 and 14–19 landscape), no blank pages between. The matrix tables are Word tables on the PDF's grid, merged cells and borders as drawn. The letterhead sits in two columns; answer choices A–D at tab stops. MathType fractions, radicals and angle arcs are Word equations; Câu 10's Cambria Math equations (page 20) and the solutions on pages 11–12 and 23–24 are pictures inside their lines. Figures sit where the PDF has them, the triangles of Câu 9 beside the answers. No Service Worker or console warning from `pdf.worker.min.mjs` during Extract. |
 
 Offscreen parsers and the .docx writer can be exercised without the
 extension: see `tools/harness/README.md`. Its pages disable

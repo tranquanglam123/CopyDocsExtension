@@ -19,7 +19,10 @@ try {
     const res = await parseFile(btoa(bin), type);
     // Same JSON trip the result takes through runtime messaging and storage.
     const stored = JSON.parse(JSON.stringify(res));
-    const blob = DocxGenerator.generate(stored.bodyHtml, stored.title || 'test', { ole: stored.ole || [] });
+    // As popup/export.js: a rewritten Word file is saved as is (`html=1` forces the generator).
+    const blob = stored.docx && !params.get('html')
+        ? new Blob([Uint8Array.from(atob(stored.docx), (c) => c.charCodeAt(0))])
+        : DocxGenerator.generate(stored.bodyHtml, stored.title || 'test', { ole: stored.ole || [] });
     await fetch('/scratch/out/' + outName, { method: 'PUT', body: blob });
     window.__result = { ole: (stored.ole || []).length, imgs: (stored.bodyHtml.match(/<img /g) || []).length, markers: (stored.bodyHtml.match(/data-ole=/g) || []).length, size: blob.size, warnings: stored.warnings };
 } catch (err) {

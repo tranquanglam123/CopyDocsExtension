@@ -9,6 +9,7 @@
  * its .bin and its preview — and written back into the exported .docx.
  */
 import { MiniUnzip } from '../../lib/unzip.js';
+import { MiniZip } from '../../lib/zip.js';
 import { escapeHtml } from '../../lib/html.js';
 import { isLegacyVnFont } from '../../lib/vnfont.js';
 import { readCfbStream } from '../../lib/cfb.js';
@@ -95,6 +96,8 @@ export async function parseDocx(bytes) {
         after: [],
         /** @type {OleObject[]} */
         ole: [],
+        /** Converted MathType `<w:object>`s, swapped in the rewritten package. */
+        converted: [],
     };
 
     const html = [];
@@ -112,7 +115,9 @@ export async function parseDocx(bytes) {
     if (usesLegacyFont(doc) || usesLegacyFont(styles)) warnings.push(WARNINGS.LEGACY_VN_FONT);
 
     const title = core?.getElementsByTagNameNS(NS.dc, 'title')[0]?.textContent?.trim() || '';
-    return { title, text: text.join('\n\n'), bodyHtml: html.join('\n'), warnings, ole: ctx.ole };
+    // Untouched files need no copy: the caller already holds their bytes.
+    const docx = ctx.converted.length > 0 ? toBase64(await convertedPackage(zip, doc, ctx.converted)) : null;
+    return { title, text: text.join('\n\n'), bodyHtml: html.join('\n'), warnings, ole: ctx.ole, ...(docx ? { docx } : {}) };
 }
 
 // ─── Blocks ─────────────────────────────────────────────────────────────────
@@ -317,6 +322,7 @@ async function oleObject(el, ctx) {
     if (math) {
         const index = ctx.ole.length;
         ctx.ole.push({ progId, omml: math.omml, linear: math.linear });
+        ctx.converted.push({ el, omml: math.omml });
         return { html: `<span data-ole="${index}">${escapeHtml(math.linear)}</span>`, text: math.linear };
     }
 
@@ -376,6 +382,131 @@ function displayWidth(el) {
     const style = el.getElementsByTagNameNS(NS.v, 'shape')[0]?.getAttribute('style') || '';
     const pt = style.match(/width:\s*([\d.]+)pt/)?.[1];
     return pt ? Math.min(MAX_IMAGE_WIDTH, Math.round(Number(pt) * 96 / 72)) : null;
+}
+
+// ─── Rewritten package ──────────────────────────────────────────────────────
+
+/**
+ * The source package with each converted MathType object swapped for its
+ * Office Math, in place, so everything else stays exactly as the author
+ * made it. The objects' .bin and preview parts go when nothing else uses them.
+ * @param {MiniUnzip} zip
+ * @param {Document} doc  word/document.xml, as parsed.
+ * @param {Array<{el: Element, omml: string}>} converted
+ * @returns {Promise<Uint8Array>}
+ */
+async function convertedPackage(zip, doc, converted) {
+    const root = doc.documentElement;
+    if (!root.lookupNamespaceURI('m')) root.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:m', NS.m);
+
+    const dropped = new Set();
+    const holders = [];
+    for (const { el, omml } of converted) {
+        const r = el.parentNode;
+        if (r?.namespaceURI !== NS.w || r.localName !== 'r' || r.parentNode?.namespaceURI !== NS.w) continue;
+        const rPr = child(r, 'rPr');
+        const math = mathNode(doc, omml, rPr);
+        if (!math) continue;
+        for (const n of el.getElementsByTagNameNS(NS.o, 'OLEObject')) dropped.add(n.getAttributeNS(NS.r, 'id'));
+        for (const n of el.getElementsByTagNameNS(NS.v, 'imagedata')) dropped.add(n.getAttributeNS(NS.r, 'id'));
+
+        // Shapes later in the file name the shapetype Word stored in this
+        // object; an empty picture keeps it.
+        const shapetypes = [...el.getElementsByTagNameNS(NS.v, 'shapetype')];
+        if (shapetypes.length > 0) {
+            const holder = doc.createElementNS(NS.w, 'w:r');
+            const pict = holder.appendChild(doc.createElementNS(NS.w, 'w:pict'));
+            for (const st of shapetypes) pict.appendChild(st);
+            r.parentNode.insertBefore(holder, r);
+            holders.push(holder);
+        }
+
+        // Anything sharing the run (rare) stays, split around the maths.
+        const after = [...r.childNodes].slice([...r.childNodes].indexOf(el) + 1);
+        if (after.some((n) => n.nodeType === 1)) {
+            const tail = doc.createElementNS(NS.w, 'w:r');
+            if (rPr) tail.appendChild(rPr.cloneNode(true));
+            for (const n of after) tail.appendChild(n);
+            r.parentNode.insertBefore(tail, r.nextSibling);
+        }
+        r.parentNode.insertBefore(math, r.nextSibling);
+        el.remove();
+        if (![...r.children].some((c) => c !== rPr)) r.remove();
+    }
+
+    const used = new Set([...doc.getElementsByTagNameNS(NS.v, 'shape')].map((s) => s.getAttribute('type')));
+    for (const holder of holders) {
+        const ids = [...holder.getElementsByTagNameNS(NS.v, 'shapetype')].map((st) => `#${st.getAttribute('id')}`);
+        if (!ids.some((id) => used.has(id))) holder.remove();
+    }
+
+    const xml = serialise(doc);
+    const relsPath = 'word/_rels/document.xml.rels';
+    const relsText = await zip.readText(relsPath);
+    const removed = new Set();
+    let rels = relsText;
+    for (const id of dropped) {
+        if (!id || xml.includes(`"${id}"`)) continue;
+        rels = rels.replace(new RegExp(`<Relationship\\b[^>]*\\bId="${id}"[^>]*/>`), (tag) => {
+            const target = tag.match(/\bTarget="([^"]+)"/)?.[1];
+            if (target && !/TargetMode="External"/.test(tag)) {
+                removed.add(target.startsWith('/') ? target.slice(1) : normalise(`word/${target}`));
+            }
+            return '';
+        });
+    }
+    // A part another relationship still names is kept.
+    for (const name of zip.names().filter((n) => n.endsWith('.rels') && n !== relsPath)) {
+        const text = await zip.readText(name);
+        for (const part of [...removed]) if (text.includes(part.split('/').pop())) removed.delete(part);
+    }
+    for (const part of [...removed]) if (rels.includes(`/${part.split('/').pop()}"`)) removed.delete(part);
+
+    const out = new MiniZip();
+    for (const name of zip.names()) {
+        if (removed.has(name)) continue;
+        if (name === 'word/document.xml') out.addFile(name, xml);
+        else if (name === relsPath) out.addFile(name, rels);
+        else if (name === '[Content_Types].xml') {
+            const types = await zip.readText(name);
+            out.addFile(name, types.replace(/<Override\b[^>]*PartName="\/([^"]+)"[^>]*\/>/g, (tag, part) => (removed.has(part) ? '' : tag)));
+        } else if (!name.endsWith('/')) out.addFile(name, await zip.read(name));
+    }
+    return new Uint8Array(await out.toBlob().arrayBuffer());
+}
+
+/**
+ * One `<m:oMath>`, its runs sized and coloured as the object's run was, in
+ * the font Word itself gives Office Math.
+ * @param {Document} doc
+ * @param {string} omml
+ * @param {Element|null} rPr  The object's run properties.
+ * @returns {Element|null} null when the OMML does not parse.
+ */
+function mathNode(doc, omml, rPr) {
+    const parsed = new DOMParser().parseFromString(`<w xmlns:m="${NS.m}" xmlns:w="${NS.w}">${omml}</w>`, 'application/xml');
+    const first = parsed.documentElement.firstElementChild;
+    if (parsed.getElementsByTagName('parsererror').length > 0 || first?.localName !== 'oMath') return null;
+    const math = doc.importNode(first, true);
+
+    const props = doc.createElementNS(NS.w, 'w:rPr');
+    const fonts = props.appendChild(doc.createElementNS(NS.w, 'w:rFonts'));
+    fonts.setAttributeNS(NS.w, 'w:ascii', 'Cambria Math');
+    fonts.setAttributeNS(NS.w, 'w:hAnsi', 'Cambria Math');
+    for (const name of ['color', 'sz', 'szCs']) {
+        const p = child(rPr, name);
+        if (p) props.appendChild(p.cloneNode(true));
+    }
+    for (const mr of math.getElementsByTagNameNS(NS.m, 'r')) {
+        const t = [...mr.children].find((c) => c.namespaceURI === NS.m && c.localName === 't');
+        mr.insertBefore(props.cloneNode(true), t || null);
+    }
+    return math;
+}
+
+function serialise(doc) {
+    const xml = new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n${xml}`;
 }
 
 // ─── Numbering ──────────────────────────────────────────────────────────────

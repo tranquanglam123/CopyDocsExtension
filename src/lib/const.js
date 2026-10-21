@@ -149,6 +149,8 @@ export const FILE_LIMITS = Object.freeze({
     /** Embeds read from one page; the rest are listed, not extracted. */
     MAX_EMBEDS: 5,
     TIMEOUT_MS: 45_000,
+    /** Google's .docx export, tried alongside the HTML; shorter, as it is optional. */
+    EXPORT_TIMEOUT_MS: 20_000,
     /** Pages rendered to pictures (scans, figures) per PDF. */
     MAX_RENDERED_PAGES: 40,
     /** JPEG bytes across every rendered page or crop of one PDF. */

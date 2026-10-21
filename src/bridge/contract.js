@@ -21,8 +21,9 @@
  * To the offscreen document — `{ type, ...payload }`:
  *
  *   PARSE               { html, docType }         → { ok:true, data } | { ok:false, error }
- *   PARSE_FILE          { base64, fileType }      → { ok:true, data: { title, text, bodyHtml, warnings, ole? } } | { ok:false, error }
+ *   PARSE_FILE          { base64, fileType }      → { ok:true, data: { title, text, bodyHtml, warnings, ole?, docx? } } | { ok:false, error }
  *                       `fileType` is 'pdf' or 'zip' (a .docx, checked inside).
+ *                       `docx` is the Word file rewritten with Office Math, base64.
  */
 
 /** Message names. `content/main.js` repeats CONTENT_READY as a literal —

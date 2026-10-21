@@ -59,9 +59,14 @@ function legacyCopy(text) {
  * @param {string} title
  * @param {string} filename
  * @param {object[]} [ole]  MathType equations bodyHtml marks with `data-ole`.
+ * @param {string} [docx]  The source Word file, base64, when that is what
+ *   was read: it is saved as is, so nothing of its formatting is lost.
  * @returns {Promise<number>} the chrome.downloads download id.
  */
-export async function downloadDocx(bodyHtml, title, filename, ole = []) {
+export async function downloadDocx(bodyHtml, title, filename, ole = [], docx = '') {
+    if (docx) {
+        return downloadDataUrl(`data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${docx}`, filename);
+    }
     const blob = DocxGenerator.generate(bodyHtml, title, { ole });
     return downloadDataUrl(await blobToDataUrl(blob), filename);
 }
