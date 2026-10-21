@@ -50,4 +50,4 @@ console.log(`${zip} (${Math.round(statSync(zip).size / 1024)} KB, ${tag} at ${sh
 if (dryRun) process.exit(0);
 
 run('gh', ['release', 'create', tag, zip, '--target', sha, '--title', tag, '--generate-notes']);
-console.log(`Released ${tag}. Installed copies see it within 12 hours.`);
+console.log(`Released ${tag}. Installed copies see it within a few hours.`);
