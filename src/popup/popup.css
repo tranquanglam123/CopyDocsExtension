@@ -355,6 +355,33 @@ body {
   color: var(--text-primary);
 }
 
+/* ─── Update Row ────────────────────────────────────────────────── */
+
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-color: rgba(110, 231, 183, 0.3);
+}
+
+.update-text {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.btn-update {
+  flex-shrink: 0;
+  width: auto;
+  padding: 6px 12px;
+}
+
+.btn-update:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 /* ─── Notification ──────────────────────────────────────────────── */
 
 .notification {

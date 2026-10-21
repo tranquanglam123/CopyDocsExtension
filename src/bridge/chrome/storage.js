@@ -104,3 +104,16 @@ export async function isEmbedImagesEnabled() {
     const value = stored[LOCAL_KEYS.EMBED_IMAGES];
     return value === undefined ? true : !!value;
 }
+
+// ─── Self-update ──────────────────────────────────────────────────────────
+
+/** @returns {Promise<object|null>} The last update check, see background/update.js. */
+export async function getUpdateInfo() {
+    const stored = await chrome.storage.local.get(LOCAL_KEYS.UPDATE_INFO);
+    return stored[LOCAL_KEYS.UPDATE_INFO] || null;
+}
+
+/** @param {object} info */
+export async function setUpdateInfo(info) {
+    await chrome.storage.local.set({ [LOCAL_KEYS.UPDATE_INFO]: info });
+}

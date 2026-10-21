@@ -27,7 +27,8 @@ the architecture tests never scan it. Upgrade it whole; never edit it.
   clipboard, `.docx` and `.txt` output. `docx.js` needs `DOMParser`, so it
   lives here rather than in `lib/`.
 - **`background/`** — `main.js` registers listeners and nothing else.
-  `check.js` answers CHECK_TAB. `extract/` holds the four backends, their
+  `check.js` answers CHECK_TAB. `update.js` answers UPDATE_STATUS and
+  UPDATE_APPLY (see Self-update). `extract/` holds the four backends, their
   transports and the watchdog.
 - **`offscreen/`** — `main.js` hosts the sandbox iframe. `pass/` holds one
   extraction pass per file, each taking a document and returning data.
@@ -124,6 +125,20 @@ its host granted: the popup requests the `origins` CHECK_TAB returned, from
 the Extract click, against `optional_host_permissions`.
 
 Slides has no working server-rendered path. `route.js` returns `null` for it.
+
+## Self-update
+
+Copies are loaded unpacked, so no Web Store updates them, and an extension
+cannot rewrite its own files. `background/update.js` asks GitHub's
+`releases/latest` (on an alarm, and when the popup opens past
+`UPDATE.CHECK_MAX_AGE_MS`), stores the answer and sets the badge.
+UPDATE_APPLY sends `update` to the native messaging host that
+`updater/install.bat` registers. That host (`updater/host.ps1`, Windows only)
+reads the release itself, mirrors the zip over the extension folder and
+replies; then the worker reloads the extension. The manifest `key` pins the
+extension ID that the host allows. `tools/release/release.mjs` publishes a
+release; `UPDATE` in `lib/const.js` names the repo, asset and host, and
+`updater/install.ps1` repeats them.
 
 ## Comments
 

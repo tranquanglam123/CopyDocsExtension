@@ -33,12 +33,17 @@ cũng dùng được.
 
 ## Cài đặt
 
-Không có trình cài đặt — nạp source trực tiếp, ở chế độ developer:
+Tiện ích nạp ở chế độ developer, không qua Chrome Web Store. Làm một lần trên mỗi máy:
 
-1. Tải hoặc clone repository này.
-2. Mở `chrome://extensions` và bật **Developer mode**.
-3. Nhấn **Load unpacked**, chọn thư mục chứa `manifest.json`.
-4. Nếu chưa thấy icon, mở menu hình mảnh ghép (puzzle-piece) và ghim lại.
+1. Vào trang [Releases](https://github.com/tranquanglam123/CopyDocsExtension/releases/latest), tải `CopyDocExt.zip`.
+2. Giải nén vào một thư mục cố định, ví dụ `Documents\CopyDocExt` (đừng để trong Downloads rồi xoá).
+3. Mở `chrome://extensions`, bật **Developer mode**, nhấn **Load unpacked**, chọn thư mục đó.
+4. Trong thư mục đó, nhấp đúp `updater\install.bat`. Nếu Windows hiện "Windows protected your PC", chọn **More info → Run anyway**.
+5. Nếu chưa thấy icon, mở menu hình mảnh ghép (puzzle-piece) và ghim lại.
+
+**Cập nhật:** khi có bản mới, icon hiện dấu **↑** và popup hiện nút **Cập nhật**. Bấm là xong — tiện ích tự tải bản mới từ GitHub, cài đè lên thư mục và khởi động lại. Gỡ trình cập nhật: `updater\uninstall.bat`.
+
+Chỉ chạy trên Windows (Chrome và Edge). Thư mục là bản clone git thì trình cập nhật từ chối — cập nhật bằng `git pull`.
 
 ## Cách dùng
 
@@ -110,6 +115,8 @@ src/
   bridge/      contract message, các facade, và mọi lệnh gọi chrome.*
   lib/         logic thuần — URL, embed, bố cục PDF, MathType, CSV, zip, i18n
   vendor/      pdf.js, nguyên bản (Apache-2.0)
+updater/       trình cài bản mới từ GitHub Releases cho Windows (native messaging)
+tools/release/ đăng một bản release
 ```
 
 ## Giấy phép

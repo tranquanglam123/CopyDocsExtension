@@ -31,6 +31,7 @@ export const dict = {
     'popup.action.originalTitle': 'Tải file PDF/Word gốc — giữ nguyên công thức và bố cục',
     'popup.docxNote': 'Lưu ý: chỉ hình đã nhúng mới có trong file .docx — hãy bật "Nhúng hình ảnh" trước khi trích xuất.',
     'popup.footer.languageLabel': 'Ngôn ngữ',
+    'popup.update.action': 'Cập nhật',
 
     // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': 'Đã phát hiện {type}',
@@ -80,6 +81,11 @@ export const dict = {
     'popup.notify.txtFailed': 'Tải xuống thất bại: {message}',
     'popup.notify.originalDownloading': 'Đang tải {count} file gốc',
     'popup.notify.originalFailed': 'Tải xuống thất bại: {message}',
+    'popup.update.available': 'Đã có phiên bản {version}.',
+    'popup.update.installing': 'Đang cài {version}…',
+    'popup.update.setup': 'Đã có phiên bản {version}. Chạy updater\\install.bat trong thư mục tiện ích một lần, sau đó chỉ cần bấm Cập nhật.',
+    'popup.notify.updated': 'Đã cập nhật lên {version} — đang khởi động lại tiện ích…',
+    'popup.notify.updateFailed': 'Cập nhật thất bại: {message}',
     'popup.notify.permissionDenied': 'Chưa được cấp quyền đọc trang chứa file — file nhúng có thể không đọc được. Nút File gốc vẫn dùng được.',
 
     // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──

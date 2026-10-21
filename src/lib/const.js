@@ -32,6 +32,8 @@ export const LOCAL_KEYS = Object.freeze({
      * session-scoped.
      */
     LAST_EXTRACTION: 'lastExtraction',
+    /** The last update check, from background/update.js. */
+    UPDATE_INFO: 'updateInfo',
 });
 
 // ─── Extraction status values ───────────────────────────────────────────────
@@ -113,6 +115,29 @@ export const WARNING_PREFIXES = Object.freeze({
 export const ALARMS = Object.freeze({
     /** Reaps pipelines abandoned by a terminated service worker. */
     PIPELINE_WATCHDOG: 'pipelineWatchdog',
+    /** Asks GitHub for a newer release. */
+    UPDATE_CHECK: 'updateCheck',
+});
+
+// ─── Self-update ────────────────────────────────────────────────────────────
+// Copies loaded unpacked have no Web Store to update them: a GitHub Release
+// says what is newest, and the native helper in updater/ installs it.
+
+export const UPDATE = Object.freeze({
+    REPO: 'tranquanglam123/CopyDocsExtension',
+    /** The release asset installed; tools/release/release.mjs uploads it. */
+    ASSET: 'CopyDocExt.zip',
+    /** Native messaging host name; updater/install.ps1 registers it. */
+    HOST: 'com.copydocext.updater',
+    /** A popup opening later than this asks GitHub again. */
+    CHECK_MAX_AGE_MS: 6 * 60 * 60 * 1000,
+    CHECK_PERIOD_MINUTES: 12 * 60,
+    PING_TIMEOUT_MS: 15_000,
+    /** Download, unpack and copy; the helper has its own network timeouts. */
+    INSTALL_TIMEOUT_MS: 5 * 60_000,
+    /** Lets the reply reach the popup before the reload closes it. */
+    RELOAD_DELAY_MS: 1_500,
+    BADGE: '↑',
 });
 
 // ─── Timing and limits ──────────────────────────────────────────────────────

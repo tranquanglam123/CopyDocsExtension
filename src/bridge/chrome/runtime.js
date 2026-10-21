@@ -56,6 +56,16 @@ export function onParseFileRequest(parseFile) {
     });
 }
 
+/** @returns {string} The manifest version of the running copy. */
+export function getExtensionVersion() {
+    return chrome.runtime.getManifest().version;
+}
+
+/** Restarts the extension from its files on disk, closing every page of it. */
+export function reloadExtension() {
+    chrome.runtime.reload();
+}
+
 /** Fires when the browser starts or the extension is installed/updated. */
 export function onStartupOrInstall(handler) {
     chrome.runtime.onStartup.addListener(() => handler('onStartup'));

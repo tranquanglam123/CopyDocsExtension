@@ -29,6 +29,7 @@ export const dict = {
     'popup.action.originalTitle': 'Download the original PDF/Word file — keeps equations and layout exactly',
     'popup.docxNote': "Note: only embedded pictures reach the .docx — keep \"Embed images\" on before extracting.",
     'popup.footer.languageLabel': 'Language',
+    'popup.update.action': 'Update',
 
     // ─── Dynamic status card (I18n.t() from popup/view.js) ─────────────
     'popup.status.docDetected': '{type} detected',
@@ -78,6 +79,11 @@ export const dict = {
     'popup.notify.txtFailed': 'Download failed: {message}',
     'popup.notify.originalDownloading': 'Downloading {count} original file(s)',
     'popup.notify.originalFailed': 'Download failed: {message}',
+    'popup.update.available': 'Version {version} is available.',
+    'popup.update.installing': 'Installing {version}…',
+    'popup.update.setup': 'Version {version} is available. Run updater\\install.bat in the extension folder once, and updates install with one click.',
+    'popup.notify.updated': 'Updated to {version} — restarting the extension…',
+    'popup.notify.updateFailed': 'Update failed: {message}',
     'popup.notify.permissionDenied': 'Access to the other site was not granted — the embedded file may not be readable. Original file download still works.',
 
     // ─── Warning codes (lib/const.js WARNINGS / WARNING_PREFIXES) ──

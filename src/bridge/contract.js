@@ -17,6 +17,10 @@
  *   OPEN_NEW_DOC        {}                        → { success }
  *   RESET               {}                        → { success }
  *   CONTENT_READY       { data: { rawHtml, title, url, docType } } → { success }
+ *   UPDATE_STATUS       {}                        → { success, data: { current, latest, available, helper, checkedAt } }
+ *                       `helper` is whether updater/install.bat has registered the native host.
+ *   UPDATE_APPLY        {}                        → { success, data: { version } } | { success:false, error }
+ *                       The extension reloads shortly after replying.
  *
  * To the offscreen document — `{ type, ...payload }`:
  *
@@ -36,6 +40,8 @@ export const MSG = Object.freeze({
     OPEN_NEW_DOC: 'openNewDoc',
     RESET: 'resetExtraction',
     CONTENT_READY: 'contentReady',
+    UPDATE_STATUS: 'updateStatus',
+    UPDATE_APPLY: 'updateApply',
     PARSE: 'parse',
     PARSE_FILE: 'parseFile',
 });

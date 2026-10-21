@@ -13,6 +13,7 @@ import {
 } from '../bridge/prefs.js';
 import * as background from '../bridge/to-background.js';
 import { ensureOrigins } from '../bridge/chrome/permissions.js';
+import { getExtensionVersion } from '../bridge/chrome/runtime.js';
 import * as view from './view.js';
 import * as exportsApi from './export.js';
 
@@ -80,6 +81,7 @@ export async function handleLanguageChange() {
     await I18n.setLanguage(view.getSelectedLanguage());
     view.applyStaticI18n();
     rerenderCurrentView();
+    renderUpdate();
 }
 
 function rerenderCurrentView() {
@@ -115,6 +117,56 @@ const EXT_LABELS = { pdf: 'embed.pdf', doc: 'embed.word', docx: 'embed.word', pp
 
 function embedLabel(embed) {
     return I18n.t(EXT_LABELS[embed.ext] || `embed.${embed.kind}`);
+}
+
+// ── Self-update ────────────────────────────────────────────────────
+// Without the helper there is nothing to click, only the one-time setup to
+// name.
+
+let updateInfo = null;
+let updateBusy = false;
+
+/** After init(): asking GitHub must never hold up the tab check. */
+export async function initUpdate() {
+    view.setVersion(getExtensionVersion());
+    try {
+        const resp = await background.getUpdateStatus();
+        updateInfo = resp?.success ? resp.data : null;
+    } catch (err) {
+        console.warn('[Popup] Update status unavailable:', err);
+    }
+    renderUpdate();
+}
+
+function renderUpdate() {
+    if (!updateInfo?.available) {
+        view.showUpdate(null);
+        return;
+    }
+    const version = updateInfo.latest;
+    if (updateBusy) {
+        view.showUpdate(I18n.t('popup.update.installing', { version }), { button: true, busy: true });
+    } else if (updateInfo.helper) {
+        view.showUpdate(I18n.t('popup.update.available', { version }), { button: true });
+    } else {
+        view.showUpdate(I18n.t('popup.update.setup', { version }));
+    }
+}
+
+export async function handleUpdate() {
+    if (updateBusy || !updateInfo?.helper) return;
+    updateBusy = true;
+    renderUpdate();
+    try {
+        const resp = await background.applyUpdate();
+        if (!resp?.success) throw new Error(resp?.error || 'no answer');
+        // The background reloads the extension next, which closes this popup.
+        view.showNotification(I18n.t('popup.notify.updated', { version: resp.data.version }), 'success');
+    } catch (err) {
+        updateBusy = false;
+        renderUpdate();
+        view.showNotification(I18n.t('popup.notify.updateFailed', { message: err.message }), 'error');
+    }
 }
 
 // ── Embed-images toggle ────────────────────────────────────────────

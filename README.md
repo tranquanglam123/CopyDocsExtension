@@ -33,12 +33,19 @@ directly in a tab works too.
 
 ## Install
 
-There is no installer — load the source directly, in developer mode:
+The extension loads in developer mode, not from the Chrome Web Store. Once per PC:
 
-1. Download or clone this repository.
-2. Open `chrome://extensions` and turn on **Developer mode**.
-3. Click **Load unpacked**, select the folder containing `manifest.json`.
-4. If the icon isn't visible, pin it from the puzzle-piece menu.
+1. From [Releases](https://github.com/tranquanglam123/CopyDocsExtension/releases/latest), download `CopyDocExt.zip`.
+2. Unzip it to a folder that stays, e.g. `Documents\CopyDocExt`.
+3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick that folder.
+4. In that folder, double-click `updater\install.bat`. If Windows says "Windows protected your PC", choose **More info → Run anyway**.
+5. If the icon isn't visible, pin it from the puzzle-piece menu.
+
+**Updates:** when a newer release is out, the icon shows **↑** and the popup an **Update** button. One click downloads it from GitHub, installs it over the folder and restarts the extension. `updater\uninstall.bat` removes the updater.
+
+Windows only (Chrome and Edge). The updater refuses a git checkout — use `git pull` there.
+
+**Publishing a release:** raise `version` in `manifest.json`, commit, push, then run `node tools/release/release.mjs` (needs `gh` signed in). It tags `v<version>` and uploads `CopyDocExt.zip`; installed copies see it within 12 hours.
 
 ## Use
 
@@ -113,6 +120,8 @@ src/
   bridge/      the message contract, the facades, and all chrome.* calls
   lib/         pure logic — URL, embeds, PDF layout, MathType, CSV, zip, i18n
   vendor/      pdf.js, unmodified (Apache-2.0)
+updater/       Windows helper that installs a GitHub release (native messaging)
+tools/release/ publishes a release
 ```
 
 ## License

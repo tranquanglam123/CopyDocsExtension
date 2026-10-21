@@ -209,6 +209,15 @@
       Note: only embedded pictures reach the .docx — keep "Embed images" on before extracting.
     </p>
 
+    <!-- A newer GitHub release, from background/update.js. The button shows
+         only once updater/install.bat has set up the helper that installs it. -->
+    <section id="update-row" class="card update-row hidden">
+      <span id="update-text" class="update-text"></span>
+      <button id="btn-update" class="btn btn-accent btn-update hidden">
+        <span data-i18n="popup.update.action">Update</span>
+      </button>
+    </section>
+
     <!-- Notification banner -->
     <div id="notification" class="notification hidden">
       <span id="notification-text"></span>
@@ -221,7 +230,7 @@
          for a language picker, so a user who picked the wrong language by
          accident can still recognize their own. -->
     <footer class="popup-footer">
-      <span>v2.0.0</span>
+      <span id="app-version"></span>
       <select id="lang-select" class="lang-select" data-i18n-aria-label="popup.footer.languageLabel"
         aria-label="Language">
         <option value="en">English</option>

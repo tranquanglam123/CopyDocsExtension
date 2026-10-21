@@ -37,6 +37,11 @@ const warningsText = document.getElementById('warnings-text');
 const chkEmbedImages = document.getElementById('chk-embed-images');
 const langSelect = document.getElementById('lang-select');
 
+const updateRow = document.getElementById('update-row');
+const updateText = document.getElementById('update-text');
+const btnUpdate = document.getElementById('btn-update');
+const appVersion = document.getElementById('app-version');
+
 /** Handles main.js needs for `addEventListener`. Every other node stays
  *  private to this module. */
 export const elements = {
@@ -49,6 +54,7 @@ export const elements = {
     btnReset,
     chkEmbedImages,
     langSelect,
+    btnUpdate,
 };
 
 // ── i18n ───────────────────────────────────────────────────────────
@@ -122,6 +128,24 @@ export function showWarnings(warnings) {
     }
     warningsText.textContent = warnings.map(warningMessage).join(' ');
     warningsBanner.classList.remove('hidden');
+}
+
+// ── Self-update ──────────────────────────────────────────────────
+
+/** @param {string} version */
+export function setVersion(version) {
+    appVersion.textContent = version ? `v${version}` : '';
+}
+
+/**
+ * @param {string|null} text  null hides the row.
+ * @param {{button?: boolean, busy?: boolean}} [opts]
+ */
+export function showUpdate(text, { button = false, busy = false } = {}) {
+    updateRow.classList.toggle('hidden', text === null);
+    updateText.textContent = text || '';
+    btnUpdate.classList.toggle('hidden', !button);
+    btnUpdate.disabled = busy;
 }
 
 // ── Embed-images toggle ────────────────────────────────────────────

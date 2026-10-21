@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "CopyDocExt",
   "version": "2.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqLX+lwMBRRx02YUNGMs71Mvfc1gw/yHS5n/CWbyfCwxXkuhyLgznQAZPS65Vpc3TEjMNOJokkyMRv/4p2hGRBXj4OjJE+Tx8fjQVl52asQ/2wY+99WAmQFXZtsndlDw25T79KDp0bFFXQtL12ne97ASCnMgcyqSptcl67ky1uwTjbUbrhto1MTROCusdBzUYW8nfNqXP+uUYYQ8FToipLk+mKrDTVsgzFQIx0WDLBM/NcwFA5S8jL7KdXEmfNB27a1CugEakc4P7tBawBi9wyhyK1PDtJ9AVQpJEtc85tPkETZJxYMwMNdeWcXzR2VptdV7MVMY82VmbS16IkNvFTQIDAQAB",
   "description": "Download & copy content from restricted Google Docs and Sheets, and the PDF/Word material web pages embed.",
   "icons": {
     "16": "icons/icon16.png",
@@ -31,7 +32,8 @@
     "storage",
     "unlimitedStorage",
     "offscreen",
-    "alarms"
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "*://docs.google.com/*"

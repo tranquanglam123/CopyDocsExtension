@@ -206,7 +206,7 @@ describe('no duplicated concepts', () => {
         // match prose.
         const guarded = [
             'embedImagesEnabled', 'uiLanguage', 'ruleAlloc',
-            'pipelineWatchdog',
+            'pipelineWatchdog', 'updateCheck', 'updateInfo',
             'single_sheet_only', 'image_not_bitmap', 'image_embed_failed',
             'style_fill_skipped_size', 'image_budget_exceeded', 'tabnav_fallback',
         ];
@@ -227,7 +227,7 @@ describe('no duplicated concepts', () => {
     test('message names are literals only in bridge/contract.js', () => {
         const guarded = [
             'checkTab', 'startExtraction', 'getExtractionStatus',
-            'openNewDoc', 'contentReady',
+            'openNewDoc', 'contentReady', 'updateStatus', 'updateApply',
         ];
         const exempt = new Set(['src/bridge/contract.js', CONTENT_ENTRY]);
 
